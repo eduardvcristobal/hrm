@@ -29,6 +29,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/me").authenticated()
                 .requestMatchers("/api/v1/security/tokens", "/api/v1/security/tokens/**").authenticated()
+                .requestMatchers("/api/v1/security/mfa", "/api/v1/security/mfa/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/security/csrf").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/security/password-reset/request").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/security/password-reset/confirm").permitAll()
