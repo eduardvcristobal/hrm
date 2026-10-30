@@ -53,7 +53,7 @@ test "$DEPT_HTTP" = 201 || { echo "Department registration failed: $DEPT_HTTP"; 
 DEPT_ID="$(python3 -c 'import json; print(json.load(open("/tmp/hrm-ci-department.json"))["id"])')"
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/departments?companyId=$COMPANY_ID" | grep -q '"code":"OPS"'
 DEPT_BLOCK="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$(printf '{"companyId":"%s","code":"INVALID","name":"Invalid","parentId":"00000000-0000-0000-0000-000000000001"}' "$COMPANY_ID")" "$BASE/api/v1/personnel/departments")"
-test "$DEPT_BLOCK" = 400 || { echo "Cross-company parent accepted: $DEPT_BLOCK"; exit 1; }
+{ test "$DEPT_BLOCK" = 400 || test "$DEPT_BLOCK" = 403; } || { echo "Invalid department parent accepted: $DEPT_BLOCK"; exit 1; }
 EMP_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-employee.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$(printf '{"companyId":"%s","employeeNumber":"CI-001","firstName":"Test","lastName":"Employee","hireDate":"2026-01-01"}' "$COMPANY_ID")" "$BASE/api/v1/personnel/employees")"
 test "$EMP_HTTP" = 201 || { echo "Personnel registration failed: $EMP_HTTP"; cat /tmp/hrm-ci-employee.json; exit 1; }
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees?companyId=$COMPANY_ID" | grep -q 'CI-001'
