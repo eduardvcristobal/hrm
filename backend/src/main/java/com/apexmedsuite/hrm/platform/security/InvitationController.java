@@ -26,8 +26,10 @@ public class InvitationController {
     private final JdbcTemplate jdbc;
     private final TenantJdbcExecutor tenants;
     private final PasswordEncoder passwords;
-    public InvitationController(JdbcTemplate jdbc,TenantJdbcExecutor tenants,PasswordEncoder passwords) {
+    private final org.springframework.transaction.support.TransactionTemplate tx;
+    public InvitationController(JdbcTemplate jdbc,TenantJdbcExecutor tenants,PasswordEncoder passwords,org.springframework.transaction.PlatformTransactionManager manager) {
         this.jdbc=jdbc;this.tenants=tenants;this.passwords=passwords;
+        this.tx=new org.springframework.transaction.support.TransactionTemplate(manager);
     }
     public record Invite(@NotBlank @Email @Size(max=254) String email,
                          @NotNull UserAdministrationController.Role role) {}
@@ -64,16 +66,9 @@ public class InvitationController {
     @PostMapping("/api/v1/invitations/accept")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void accept(@Valid @RequestBody Accept input) {
-        // Token has 256 bits entropy, is only stored hashed, and is single-use.
-        // One transaction serializes concurrent requests for the same token.
-        jdbc.execute((org.springframework.jdbc.core.ConnectionCallback<Void>) conn -> {
-            // Transaction handling must be provided by the service layer, not a raw callback.
-            return null;
-        });
-        acceptTransaction(input);
+        tx.executeWithoutResult(status -> acceptInTransaction(input));
     }
-    @org.springframework.transaction.annotation.Transactional
-    public void acceptTransaction(Accept input) {
+    private void acceptInTransaction(Accept input) {
         var invites=jdbc.query("""
            SELECT id,tenant_id,email,role FROM auth_invitation
            WHERE token_sha256=? AND used_at IS NULL AND expires_at>now()
