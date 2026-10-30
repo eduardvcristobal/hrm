@@ -93,6 +93,11 @@ REPORT_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-superv
 test "$REPORT_HTTP" = 200 || { echo "Supervisor update failed: $REPORT_HTTP"; cat /tmp/hrm-ci-supervisor.json; exit 1; }
 SELF_REPORT="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data "$(printf '{"supervisorId":"%s"}' "$EMP_ID")" "$BASE/api/v1/personnel/employees/$EMP_ID/supervisor")"
 { test "$SELF_REPORT" = 400 || test "$SELF_REPORT" = 403; } || { echo "Self supervisor accepted: $SELF_REPORT"; exit 1; }
+CHILD_DEPT="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-child-dept.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$(printf '{"companyId":"%s","code":"OPS_CHILD","name":"Operations Child","parentId":"%s"}' "$COMPANY_ID" "$DEPT_ID")" "$BASE/api/v1/personnel/departments")"
+test "$CHILD_DEPT" = 201 || { echo "Child department failed: $CHILD_DEPT"; exit 1; }
+CHILD_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-child-dept.json"))["id"])')"
+CYCLE_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X PATCH -H 'Content-Type: application/json' --data "$(printf '{"parentId":"%s"}' "$CHILD_ID")" "$BASE/api/v1/personnel/departments/$DEPT_ID/parent")"
+{ test "$CYCLE_STATUS" = 403 || test "$CYCLE_STATUS" = 409; } || { echo "Department cycle accepted: $CYCLE_STATUS"; exit 1; }
 REVOKED="$(curl -sS -X DELETE -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/security/tokens/current")"
 test "$REVOKED" = 204 || { echo "Token revoke returned $REVOKED"; exit 1; }
 AFTER="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
