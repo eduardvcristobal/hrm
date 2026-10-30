@@ -18,6 +18,11 @@ public class SecurityConfig {
         return http
             .addFilterBefore(new LoginThrottleFilter(jdbc), BasicAuthenticationFilter.class)
             .addFilterBefore(new BearerTokenFilter(tokens), BasicAuthenticationFilter.class)
+            .csrf(csrf -> csrf.ignoringRequestMatchers(request -> {
+                String header = request.getHeader("Authorization");
+                return header != null && header.startsWith("Bearer ")
+                    && request.getRequestURI().startsWith("/api/v1/");
+            }))
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
             .httpBasic(basic -> {})
             .authorizeHttpRequests(auth -> auth
