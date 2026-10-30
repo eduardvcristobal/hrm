@@ -26,6 +26,32 @@ public class OnboardingChecklistController {
         @NotBlank @Size(max=160) String label,boolean mandatory) {}
     public record Verification(@NotBlank @Pattern(regexp="VERIFIED|REJECTED") String status,
                                UUID evidenceDocumentId) {}
+    /** Idempotent baseline template; requirements remain pending until an authorized verifier reviews them. */
+    @PostMapping("/apply-template")
+    public List<Requirement> applyTemplate(@AuthenticationPrincipal HrmUserPrincipal user,
+                 @PathVariable UUID employeeId,@PathVariable UUID caseId) {
+        return tenants.inTenant(user.tenantId(),()->{
+            ensureCase(user.tenantId(),employeeId,caseId,true);
+            for(String[] requirement:new String[][] {
+                    {"IDENTITY_REVIEW","Verify employee identity"},
+                    {"EMPLOYMENT_CONTRACT","Review signed employment contract"},
+                    {"POLICY_ACK","Confirm workplace policy acknowledgment"},
+                    {"CONTACT_VERIFICATION","Verify contact details"}}) {
+                jdbc.update("""
+                    INSERT INTO personnel_onboarding_requirement
+                     (tenant_id,hr_case_id,requirement_code,label,mandatory)
+                    VALUES(?,?,?,?,true)
+                    ON CONFLICT(tenant_id,hr_case_id,requirement_code) DO NOTHING
+                    """,user.tenantId(),caseId,requirement[0],requirement[1]);
+            }
+            audit(user,"ONBOARDING_TEMPLATE_APPLIED",caseId);
+            return jdbc.query("""
+                SELECT id,requirement_code,label,mandatory,status,evidence_document_id
+                FROM personnel_onboarding_requirement WHERE tenant_id=? AND hr_case_id=?
+                ORDER BY requirement_code LIMIT 100
+                """,(rs,i)->row(rs),user.tenantId(),caseId);
+        });
+    }
     @GetMapping
     public List<Requirement> list(@AuthenticationPrincipal HrmUserPrincipal user,@PathVariable UUID employeeId,
                                   @PathVariable UUID caseId) {
