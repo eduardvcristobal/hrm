@@ -31,10 +31,10 @@ public class CompanyController {
     public List<Company> list(@AuthenticationPrincipal HrmUserPrincipal user) {
         return tenants.inTenant(user.tenantId(), () -> jdbc.query("""
             SELECT id,company_code,legal_name,country_code,timezone
-            FROM company ORDER BY company_code
+            FROM company WHERE tenant_id = ? ORDER BY company_code
             """, (rs,i) -> new Company(
                 rs.getObject("id", UUID.class),rs.getString("company_code"),
-                rs.getString("legal_name"),rs.getString("country_code"),rs.getString("timezone"))));
+                rs.getString("legal_name"),rs.getString("country_code"),rs.getString("timezone")), user.tenantId()));
     }
 
     @PostMapping
