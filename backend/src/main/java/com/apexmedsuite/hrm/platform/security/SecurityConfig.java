@@ -19,6 +19,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/me").authenticated()
+                .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").hasRole("TENANT_ADMIN")
                 .requestMatchers("/api/v1/companies", "/api/v1/companies/**").hasRole("TENANT_ADMIN")
                 .anyRequest().denyAll())
             .build();
