@@ -40,17 +40,32 @@ public class AttendanceSummaryController {
             if(count==null||count==0)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Employee not found");
             List<Punch> punches=jdbc.query("""
                 SELECT clock_in_at,clock_out_at FROM time_attendance_session
-                WHERE tenant_id=? AND employee_id=? AND clock_in_at>=? AND clock_in_at<?
-                ORDER BY clock_in_at LIMIT 500
+                WHERE tenant_id=? AND employee_id=? AND clock_in_at<? AND (clock_out_at IS NULL OR clock_out_at>?)
+                ORDER BY clock_in_at LIMIT 501
                 """,(rs,n)->new Punch(rs.getTimestamp(1).toInstant(),
                     rs.getTimestamp(2)==null?null:rs.getTimestamp(2).toInstant()),
-                    user.tenantId(),employeeId,Timestamp.from(lower),Timestamp.from(upper));
+                    user.tenantId(),employeeId,Timestamp.from(upper),Timestamp.from(lower));
+            if(punches.size()>500)throw new ResponseStatusException(HttpStatus.CONFLICT,"Attendance report exceeds 500 sessions; narrow the date range");
             Map<LocalDate,long[]> totals=new TreeMap<>();
             for(Punch p:punches){
-                LocalDate day=p.start().atZone(zone).toLocalDate();
-                long[] tally=totals.computeIfAbsent(day,k->new long[2]);
-                if(p.end()==null)tally[1]++;
-                else tally[0]+=Duration.between(p.start(),p.end()).toMinutes();
+                if(p.end()==null){
+                    LocalDate day=p.start().atZone(zone).toLocalDate();
+                    if(!day.isBefore(from)&&!day.isAfter(to))
+                        totals.computeIfAbsent(day,k->new long[2])[1]++;
+                    continue;
+                }
+                // Allocate elapsed minutes to each local calendar day, including overnight
+                // and DST boundaries. Never mistake this for payable or approved hours.
+                Instant cursor=p.start().isBefore(lower)?lower:p.start();
+                Instant finish=p.end().isAfter(upper)?upper:p.end();
+                while(cursor.isBefore(finish)){
+                    LocalDate day=cursor.atZone(zone).toLocalDate();
+                    Instant midnight=day.plusDays(1).atStartOfDay(zone).toInstant();
+                    Instant segmentEnd=finish.isBefore(midnight)?finish:midnight;
+                    totals.computeIfAbsent(day,k->new long[2])[0]+=
+                        Duration.between(cursor,segmentEnd).toMinutes();
+                    cursor=segmentEnd;
+                }
             }
             return totals.entrySet().stream()
                 .map(e->new DailySummary(e.getKey(),e.getValue()[0],(int)e.getValue()[1]))
