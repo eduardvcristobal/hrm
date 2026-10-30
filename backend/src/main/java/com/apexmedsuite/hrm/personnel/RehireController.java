@@ -112,6 +112,31 @@ public class RehireController {
             return result;
         });
     }
+    @PostMapping("/{requestId}/reject")
+    public RehireRequest reject(@AuthenticationPrincipal HrmUserPrincipal user,@PathVariable UUID employeeId,
+                                @PathVariable UUID requestId) {
+        return tenants.inTenant(user.tenantId(),()->{
+            jdbc.query("SELECT employment_status FROM personnel_employee WHERE tenant_id=? AND id=? FOR UPDATE",
+                (rs,i)->rs.getString(1),user.tenantId(),employeeId);
+            List<UUID> requesters=jdbc.query("""
+                SELECT requested_by FROM personnel_rehire_request
+                WHERE tenant_id=? AND employee_id=? AND id=? AND status='PENDING' FOR UPDATE
+                """,(rs,i)->rs.getObject(1,UUID.class),user.tenantId(),employeeId,requestId);
+            if(requesters.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Pending request not found");
+            if(requesters.get(0).equals(user.id()))
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Independent rejection required");
+            RehireRequest result=jdbc.queryForObject("""
+                UPDATE personnel_rehire_request SET status='REJECTED',approved_by=?,approved_at=now()
+                WHERE tenant_id=? AND employee_id=? AND id=?
+                RETURNING id,effective_date,employment_type,status,requested_by,approved_by
+                """,(rs,i)->row(rs),user.id(),user.tenantId(),employeeId,requestId);
+            jdbc.update("""
+                INSERT INTO audit_event(tenant_id,actor_id,action,entity_type,entity_id)
+                VALUES(?,?,'REHIRE_REJECTED','personnel_rehire_request',?)
+                """,user.tenantId(),user.id(),requestId);
+            return result;
+        });
+    }
     private record Pending(LocalDate effectiveDate,String employmentType,String reason,UUID requestedBy) {}
     private static RehireRequest row(java.sql.ResultSet rs) throws java.sql.SQLException {
         return new RehireRequest(rs.getObject("id",UUID.class),
