@@ -45,7 +45,7 @@ public class DocumentReviewController {
             java.util.Arrays.fill(plain,(byte)0);
             jdbc.update("""
                 UPDATE personnel_document_metadata SET scan_status=?,scanned_at=now()
-                WHERE tenant_id=? AND employee_id=? AND id=? AND review_status='QUARANTINED'
+                WHERE tenant_id=? AND employee_id=? AND id=? AND review_status='QUARANTINED' AND deleted_at IS NULL
                 """,verdict.name(),user.tenantId(),employeeId,documentId);
             jdbc.update("""
                 INSERT INTO audit_event(tenant_id,actor_id,action,entity_type,entity_id)
