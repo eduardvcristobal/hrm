@@ -91,6 +91,12 @@ public class HrCaseController {
                 if(required==null||required==0||incomplete!=null&&incomplete>0)
                     throw new ResponseStatusException(HttpStatus.CONFLICT,"Required exit clearances are incomplete");
 
+                Integer unresolvedAssets=jdbc.queryForObject("""
+                    SELECT count(*) FROM personnel_separation_asset
+                    WHERE tenant_id=? AND hr_case_id=? AND status<>'RETURNED'
+                    """,Integer.class,user.tenantId(),caseId);
+                if(unresolvedAssets!=null&&unresolvedAssets>0)
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,"Equipment reconciliation incomplete");
                 if(status.equals("TERMINATED")||status.equals("RETIRED"))
                     throw new ResponseStatusException(HttpStatus.CONFLICT,"Employee already separated");
                 LocalDate latest=jdbc.queryForObject("""
