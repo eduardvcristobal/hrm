@@ -27,7 +27,7 @@ GRANT SELECT,INSERT,UPDATE ON personnel_department,personnel_employee,personnel_
 GRANT SELECT,INSERT ON personnel_employment_history TO hrm_runtime;
 GRANT SELECT,INSERT ON personnel_compensation_history TO hrm_runtime;
 GRANT SELECT,INSERT ON personnel_assignment_history TO hrm_runtime;
-GRANT SELECT,INSERT,UPDATE(status,approved_by,approved_at) ON personnel_rehire_request TO hrm_runtime;
+GRANT SELECT,INSERT,UPDATE(status,approved_by,approved_at,cancelled_by,cancelled_at) ON personnel_rehire_request TO hrm_runtime;
 GRANT SELECT,INSERT,UPDATE ON personnel_private_data TO hrm_runtime;
 GRANT SELECT,INSERT,UPDATE(status,decided_by,decided_at) ON personnel_hr_case TO hrm_runtime;
 GRANT SELECT,INSERT ON personnel_document_metadata TO hrm_runtime;
