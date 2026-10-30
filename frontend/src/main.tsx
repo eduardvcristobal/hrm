@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import App, { InvitationAcceptance } from './App';
+import TimekeepingPage from './TimekeepingPage';
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 
@@ -15,6 +16,7 @@ function AppRoutes() {
         <Route path="/signup" element={<App signupPage />} />
         <Route path="/invite/accept" element={<InvitationAcceptance />} />
         <Route path="/dashboard" element={<App dashboardPage />} />
+        <Route path="/timekeeping" element={<TimekeepingPage />} />
         <Route path="*" element={<App />} />
       </Routes>
     </BrowserRouter>
