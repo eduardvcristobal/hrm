@@ -3,7 +3,7 @@
 BEGIN;
 CREATE ROLE hrm_personnel_probe NOLOGIN NOSUPERUSER NOBYPASSRLS;
 GRANT USAGE ON SCHEMA public TO hrm_personnel_probe;
-GRANT SELECT ON personnel_department,personnel_employee,personnel_employment_history TO hrm_personnel_probe;
+GRANT SELECT ON personnel_department,personnel_employee,personnel_employment_history,personnel_assignment_history,personnel_compensation_history TO hrm_personnel_probe;
 CREATE TEMP TABLE p_fixture(a uuid,b uuid,company_a uuid,company_b uuid,emp_a uuid,emp_b uuid);
 INSERT INTO p_fixture VALUES (gen_random_uuid(),gen_random_uuid(),gen_random_uuid(),gen_random_uuid(),gen_random_uuid(),gen_random_uuid());
 INSERT INTO tenant(id,slug,display_name)
@@ -19,6 +19,16 @@ INSERT INTO company(id,tenant_id,company_code,legal_name)
  SELECT company_b,b,'PERSON_B','Personnel B' FROM p_fixture;
 INSERT INTO personnel_employee(id,tenant_id,company_id,employee_number,first_name,last_name,hire_date)
  SELECT emp_b,b,company_b,'B-001','Bob','TenantB',DATE '2026-01-01' FROM p_fixture;
+SELECT set_config('app.tenant_id',a::text,true) FROM p_fixture;
+INSERT INTO personnel_assignment_history(tenant_id,employee_id,company_id,effective_date,reason,recorded_by)
+ SELECT a,emp_a,company_a,DATE '2026-02-01','A assignment',gen_random_uuid() FROM p_fixture;
+INSERT INTO personnel_compensation_history(tenant_id,employee_id,effective_date,amount,pay_basis,reason,recorded_by)
+ SELECT a,emp_a,DATE '2026-02-01',25000,'MONTHLY','A compensation',gen_random_uuid() FROM p_fixture;
+SELECT set_config('app.tenant_id',b::text,true) FROM p_fixture;
+INSERT INTO personnel_assignment_history(tenant_id,employee_id,company_id,effective_date,reason,recorded_by)
+ SELECT b,emp_b,company_b,DATE '2026-02-01','B assignment',gen_random_uuid() FROM p_fixture;
+INSERT INTO personnel_compensation_history(tenant_id,employee_id,effective_date,amount,pay_basis,reason,recorded_by)
+ SELECT b,emp_b,DATE '2026-02-01',35000,'MONTHLY','B compensation',gen_random_uuid() FROM p_fixture;
 SELECT a::text AS tenant_a FROM p_fixture \gset
 SET LOCAL ROLE hrm_personnel_probe;
 SELECT set_config('app.tenant_id', :'tenant_a',true);
@@ -26,13 +36,16 @@ DO $check$
 BEGIN
  IF (SELECT count(*) FROM personnel_employee WHERE employee_number IN ('A-001','B-001')) <> 1
  THEN RAISE EXCEPTION 'Personnel tenant isolation failed'; END IF;
+ IF (SELECT count(*) FROM personnel_assignment_history) <> 1 OR (SELECT count(*) FROM personnel_compensation_history) <> 1
+ THEN RAISE EXCEPTION 'Sensitive personnel data breached tenant boundary'; END IF;
  IF EXISTS (SELECT 1 FROM personnel_employee WHERE employee_number='B-001')
  THEN RAISE EXCEPTION 'Cross-tenant personnel exposed'; END IF;
 END $check$;
 SELECT set_config('app.tenant_id','',true);
 DO $check$
 BEGIN
- IF EXISTS (SELECT 1 FROM personnel_employee)
+ IF EXISTS (SELECT 1 FROM personnel_employee) OR EXISTS (SELECT 1 FROM personnel_assignment_history)
+    OR EXISTS (SELECT 1 FROM personnel_compensation_history)
  THEN RAISE EXCEPTION 'Personnel visible without tenant context'; END IF;
 END $check$;
 RESET ROLE;
