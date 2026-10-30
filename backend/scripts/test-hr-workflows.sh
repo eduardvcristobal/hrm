@@ -27,3 +27,6 @@ test "$CLEARANCE_CODE" = 201 || { echo "Exit clearance creation failed: $CLEARAN
 CLEARANCE_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-ci-clearance.json"))["id"])')"
 REVIEW_CODE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-reviewed.json -w '%{http_code}' -X PATCH -H 'Content-Type: application/json' --data '{"status":"CLEARED"}' "$BASE/api/v1/personnel/employees/$EMP_ID/hr-cases/$SEPARATION_ID/clearances/$CLEARANCE_ID")"
 test "$REVIEW_CODE" = 200 || { echo "Clearance review failed: $REVIEW_CODE"; cat /tmp/hrm-ci-reviewed.json; exit 1; }
+
+FINAL_PAY_PENDING="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/personnel/employees/$EMP_ID/hr-cases/$SEPARATION_ID/final-pay")"
+{ test "$FINAL_PAY_PENDING" = 403 || test "$FINAL_PAY_PENDING" = 409; } || { echo "Unapproved final-pay handoff accepted: $FINAL_PAY_PENDING"; exit 1; }
