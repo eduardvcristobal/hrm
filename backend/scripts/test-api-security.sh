@@ -29,6 +29,7 @@ for i in $(seq 1 10); do
   BAD="$(curl -sS -u 'admin-ci@example.test:incorrect-password' -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
   test "$BAD" = 401 || { echo "Invalid login should return 401, got $BAD"; exit 1; }
 done
+PGPASSWORD="$DB_PASSWORD" psql -X -h localhost -p 5433 -U "${DB_USERNAME:-hrm_app}" -d hrm_dev -c 'SELECT attempts,window_start FROM auth_login_attempt ORDER BY updated_at DESC LIMIT 5'
 LOCKED="$(curl -sS -u 'admin-ci@example.test:incorrect-password' -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
 test "$LOCKED" = 429 || { echo "Expected throttle 429, got $LOCKED"; exit 1; }
 echo 'HTTP CSRF, tenant scope, and failed-login throttle passed'
