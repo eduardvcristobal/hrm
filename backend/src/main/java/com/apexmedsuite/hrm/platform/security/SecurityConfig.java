@@ -37,7 +37,14 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/admin/invitations", "/api/v1/admin/invitations/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
                 .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
                 .requestMatchers("/api/v1/companies", "/api/v1/companies/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
-                .requestMatchers("/api/v1/personnel/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
+                .requestMatchers("/api/v1/personnel/employees/*/compensation", "/api/v1/personnel/employees/*/compensation/**")
+                    .access((authentication,context) -> new org.springframework.security.authorization.AuthorizationDecision(
+                        authentication.get().getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_MFA_VERIFIED")) &&
+                        authentication.get().getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_TENANT_ADMIN") || a.getAuthority().equals("ROLE_PAYROLL_OFFICER"))))
+                .requestMatchers("/api/v1/personnel/**")
+                    .access((authentication,context) -> new org.springframework.security.authorization.AuthorizationDecision(
+                        authentication.get().getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_MFA_VERIFIED")) &&
+                        authentication.get().getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_TENANT_ADMIN") || a.getAuthority().equals("ROLE_HR_ADMIN"))))
                 .anyRequest().denyAll())
             .build();
     }
