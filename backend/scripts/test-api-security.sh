@@ -64,7 +64,11 @@ curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees/$
 PAY_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-pay.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"effectiveDate":"2026-05-01","amount":25000.00,"payBasis":"MONTHLY","reason":"Initial compensation"}' "$BASE/api/v1/personnel/employees/$EMP_ID/compensation")"
 test "$PAY_HTTP" = 201 || { echo "Compensation creation failed: $PAY_HTTP"; cat /tmp/hrm-ci-pay.json; exit 1; }
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees/$EMP_ID/compensation" | grep -q '25000.00'
-ASSIGN_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-assignment.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$(printf '{"companyId":"%s","departmentId":"%s","effectiveDate":"2026-06-01","reason":"Operations assignment"}' "$COMPANY_ID" "$DEPT_ID")" "$BASE/api/v1/personnel/employees/$EMP_ID/assignments")"
+POSITION_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-position.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$(printf '{"companyId":"%s","code":"ANALYST","name":"Business Analyst"}' "$COMPANY_ID")" "$BASE/api/v1/personnel/positions")"
+test "$POSITION_HTTP" = 201 || { echo "Position registration failed: $POSITION_HTTP"; cat /tmp/hrm-ci-position.json; exit 1; }
+POSITION_ID="$(python3 -c 'import json; print(json.load(open("/tmp/hrm-ci-position.json"))["id"])')"
+curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/positions?companyId=$COMPANY_ID" | grep -q 'ANALYST'
+ASSIGN_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-assignment.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$(printf '{"companyId":"%s","departmentId":"%s","positionId":"%s","effectiveDate":"2026-06-01","reason":"Operations assignment"}' "$COMPANY_ID" "$DEPT_ID" "$POSITION_ID")" "$BASE/api/v1/personnel/employees/$EMP_ID/assignments")"
 test "$ASSIGN_HTTP" = 201 || { echo "Assignment failed: $ASSIGN_HTTP"; cat /tmp/hrm-ci-assignment.json; exit 1; }
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees/$EMP_ID/assignments" | grep -q 'Operations assignment'
 CROSS_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"companyId":"00000000-0000-0000-0000-000000000001","effectiveDate":"2026-07-01","reason":"Cross company"}' "$BASE/api/v1/personnel/employees/$EMP_ID/assignments")"
