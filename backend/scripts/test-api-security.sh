@@ -98,6 +98,10 @@ test "$CHILD_DEPT" = 201 || { echo "Child department failed: $CHILD_DEPT"; exit 
 CHILD_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-child-dept.json"))["id"])')"
 CYCLE_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X PATCH -H 'Content-Type: application/json' --data "$(printf '{"parentId":"%s"}' "$CHILD_ID")" "$BASE/api/v1/personnel/departments/$DEPT_ID/parent")"
 { test "$CYCLE_STATUS" = 403 || test "$CYCLE_STATUS" = 409; } || { echo "Department cycle accepted: $CYCLE_STATUS"; exit 1; }
+SEPARATION="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"effectiveDate":"2026-08-01","status":"TERMINATED","type":"REGULAR","reason":"CI separation"}' "$BASE/api/v1/personnel/employees/$EMP_ID/employment")"
+test "$SEPARATION" = 201 || { echo "Separation failed: $SEPARATION"; exit 1; }
+REHIRE_REQUEST="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-rehire.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"effectiveDate":"2026-09-01","employmentType":"REGULAR","reason":"CI rehire request"}' "$BASE/api/v1/personnel/employees/$EMP_ID/rehire-requests")"
+test "$REHIRE_REQUEST" = 201 || { echo "Rehire request failed: $REHIRE_REQUEST"; cat /tmp/hrm-rehire.json; exit 1; }
 REVOKED="$(curl -sS -X DELETE -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/security/tokens/current")"
 test "$REVOKED" = 204 || { echo "Token revoke returned $REVOKED"; exit 1; }
 AFTER="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
