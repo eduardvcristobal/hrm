@@ -21,9 +21,9 @@ public class AssignmentController {
     public AssignmentController(JdbcTemplate jdbc,TenantJdbcExecutor tenants) {
         this.jdbc=jdbc;this.tenants=tenants;
     }
-    public record Assignment(UUID id,UUID companyId,UUID branchId,UUID departmentId,
+    public record Assignment(UUID id,UUID companyId,UUID branchId,UUID departmentId,UUID positionId,
                               LocalDate effectiveDate,String reason) {}
-    public record NewAssignment(@NotNull UUID companyId,UUID branchId,UUID departmentId,
+    public record NewAssignment(@NotNull UUID companyId,UUID branchId,UUID departmentId,UUID positionId,
                                  @NotNull @PastOrPresent LocalDate effectiveDate,
                                  @NotBlank @Size(max=250) String reason) {}
     @GetMapping
@@ -31,7 +31,7 @@ public class AssignmentController {
         return tenants.inTenant(user.tenantId(),()->{
             ensureEmployee(user.tenantId(),employeeId);
             return jdbc.query("""
-                SELECT id,company_id,branch_id,department_id,effective_date,reason
+                SELECT id,company_id,branch_id,department_id,position_id,effective_date,reason
                 FROM personnel_assignment_history WHERE tenant_id=? AND employee_id=?
                 ORDER BY effective_date DESC LIMIT 100
                 """,(rs,i)->row(rs),user.tenantId(),employeeId);
@@ -63,6 +63,13 @@ public class AssignmentController {
                     """,Integer.class,user.tenantId(),input.companyId(),input.branchId());
                 if(n==null||n==0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid branch");
             }
+            if(input.positionId()!=null) {
+                Integer n=jdbc.queryForObject("""
+                    SELECT count(*) FROM personnel_position
+                    WHERE tenant_id=? AND company_id=? AND id=? AND active
+                    """,Integer.class,user.tenantId(),input.companyId(),input.positionId());
+                if(n==null||n==0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid position");
+            }
             if(input.departmentId()!=null) {
                 Integer n=jdbc.queryForObject("""
                     SELECT count(*) FROM personnel_department
@@ -72,15 +79,15 @@ public class AssignmentController {
             }
             Assignment result=jdbc.queryForObject("""
                 INSERT INTO personnel_assignment_history
-                  (tenant_id,employee_id,company_id,branch_id,department_id,effective_date,reason,recorded_by)
-                VALUES(?,?,?,?,?,?,?,?)
+                  (tenant_id,employee_id,company_id,branch_id,department_id,position_id,effective_date,reason,recorded_by)
+                VALUES(?,?,?,?,?,?,?,?,?)
                 RETURNING id,company_id,branch_id,department_id,effective_date,reason
                 """,(rs,i)->row(rs),user.tenantId(),employeeId,input.companyId(),
-                input.branchId(),input.departmentId(),input.effectiveDate(),input.reason().trim(),user.id());
+                input.branchId(),input.departmentId(),input.positionId(),input.effectiveDate(),input.reason().trim(),user.id());
             jdbc.update("""
-                UPDATE personnel_employee SET branch_id=?,department_id=?,updated_at=now()
+                UPDATE personnel_employee SET branch_id=?,department_id=?,position_id=?,updated_at=now()
                 WHERE tenant_id=? AND id=?
-                """,input.branchId(),input.departmentId(),user.tenantId(),employeeId);
+                """,input.branchId(),input.departmentId(),input.positionId(),user.tenantId(),employeeId);
             jdbc.update("""
                 INSERT INTO audit_event(tenant_id,actor_id,action,entity_type,entity_id)
                 VALUES(?,?,'EMPLOYEE_ASSIGNED','personnel_employee',?)
@@ -97,6 +104,7 @@ public class AssignmentController {
     private static Assignment row(java.sql.ResultSet rs) throws java.sql.SQLException {
         return new Assignment(rs.getObject("id",UUID.class),rs.getObject("company_id",UUID.class),
             rs.getObject("branch_id",UUID.class),rs.getObject("department_id",UUID.class),
+            rs.getObject("position_id",UUID.class),
             rs.getObject("effective_date",LocalDate.class),rs.getString("reason"));
     }
 }
