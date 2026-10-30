@@ -31,9 +31,9 @@ public class MfaService {
             byte[] secret=new byte[20];RANDOM.nextBytes(secret);
             String encoded=HexFormat.of().formatHex(secret);
             jdbc.update("""
-                INSERT INTO auth_totp_factor(identity_id,secret_base32,enabled,last_counter)
+                INSERT INTO auth_totp_factor(identity_id,secret_hex,enabled,last_counter)
                 VALUES (?,?,false,-1)
-                ON CONFLICT (identity_id) DO UPDATE SET secret_base32=EXCLUDED.secret_base32,
+                ON CONFLICT (identity_id) DO UPDATE SET secret_hex=EXCLUDED.secret_hex,
                     enabled=false,last_counter=-1
                 WHERE auth_totp_factor.enabled=false
                 """,user.id(),encoded);
@@ -43,7 +43,7 @@ public class MfaService {
     public void confirm(HrmUserPrincipal user,String code) {
         transactions.executeWithoutResult(status -> {
             var rows=jdbc.query("""
-                SELECT secret_base32,last_counter FROM auth_totp_factor
+                SELECT secret_hex,last_counter FROM auth_totp_factor
                 WHERE identity_id=? AND enabled=false FOR UPDATE
                 """,(rs,n)->new Factor(rs.getString(1),rs.getLong(2)),user.id());
             if(rows.size()!=1) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"No pending authenticator");
@@ -65,7 +65,7 @@ public class MfaService {
     public void requireVerified(HrmUserPrincipal user,String code) {
         transactions.executeWithoutResult(status -> {
             var rows=jdbc.query("""
-                SELECT secret_base32,last_counter FROM auth_totp_factor
+                SELECT secret_hex,last_counter FROM auth_totp_factor
                 WHERE identity_id=? AND enabled=true FOR UPDATE
                 """,(rs,n)->new Factor(rs.getString(1),rs.getLong(2)),user.id());
             if(rows.size()!=1) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Authenticator enrollment required");
