@@ -69,6 +69,10 @@ test "$ASSIGN_HTTP" = 201 || { echo "Assignment failed: $ASSIGN_HTTP"; cat /tmp/
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees/$EMP_ID/assignments" | grep -q 'Operations assignment'
 CROSS_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"companyId":"00000000-0000-0000-0000-000000000001","effectiveDate":"2026-07-01","reason":"Cross company"}' "$BASE/api/v1/personnel/employees/$EMP_ID/assignments")"
 { test "$CROSS_HTTP" = 400 || test "$CROSS_HTTP" = 403; } || { echo "Cross-company assignment not denied: $CROSS_HTTP"; exit 1; }
+BASIC_SALARY="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' "$BASE/api/v1/personnel/employees/$EMP_ID/compensation")"
+test "$BASIC_SALARY" = 403 || { echo "Basic-only credentials accessed compensation: $BASIC_SALARY"; exit 1; }
+ANON_SALARY="$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/api/v1/personnel/employees/$EMP_ID/compensation")"
+{ test "$ANON_SALARY" = 401 || test "$ANON_SALARY" = 403; } || { echo "Anonymous compensation access: $ANON_SALARY"; exit 1; }
 REVOKED="$(curl -sS -X DELETE -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/security/tokens/current")"
 test "$REVOKED" = 204 || { echo "Token revoke returned $REVOKED"; exit 1; }
 AFTER="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
