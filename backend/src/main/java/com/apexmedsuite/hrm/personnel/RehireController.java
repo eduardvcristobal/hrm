@@ -137,6 +137,34 @@ public class RehireController {
             return result;
         });
     }
+    @PostMapping("/{requestId}/cancel")
+    public RehireRequest cancel(@AuthenticationPrincipal HrmUserPrincipal user,@PathVariable UUID employeeId,
+                                @PathVariable UUID requestId) {
+        return tenants.inTenant(user.tenantId(),()->{
+            List<String> employee=jdbc.query("""
+                SELECT employment_status FROM personnel_employee WHERE tenant_id=? AND id=? FOR UPDATE
+                """,(rs,i)->rs.getString(1),user.tenantId(),employeeId);
+            if(employee.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Employee not found");
+            List<UUID> requesters=jdbc.query("""
+                SELECT requested_by FROM personnel_rehire_request
+                WHERE tenant_id=? AND employee_id=? AND id=? AND status='PENDING' FOR UPDATE
+                """,(rs,i)->rs.getObject(1,UUID.class),user.tenantId(),employeeId,requestId);
+            if(requesters.isEmpty()) throw new ResponseStatusException(HttpStatus.CONFLICT,"Request is not pending");
+            if(!requesters.get(0).equals(user.id()))
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Only requester may cancel");
+            RehireRequest result=jdbc.queryForObject("""
+                UPDATE personnel_rehire_request
+                SET status='CANCELLED',cancelled_by=?,cancelled_at=now()
+                WHERE tenant_id=? AND employee_id=? AND id=? AND status='PENDING'
+                RETURNING id,effective_date,employment_type,status,requested_by,approved_by
+                """,(rs,i)->row(rs),user.id(),user.tenantId(),employeeId,requestId);
+            jdbc.update("""
+                INSERT INTO audit_event(tenant_id,actor_id,action,entity_type,entity_id)
+                VALUES(?,?,'REHIRE_CANCELLED','personnel_rehire_request',?)
+                """,user.tenantId(),user.id(),requestId);
+            return result;
+        });
+    }
     private record Pending(LocalDate effectiveDate,String employmentType,String reason,UUID requestedBy) {}
     private static RehireRequest row(java.sql.ResultSet rs) throws java.sql.SQLException {
         return new RehireRequest(rs.getObject("id",UUID.class),
