@@ -71,7 +71,7 @@ public class MfaService {
                 """,(rs,n)->new Factor(rs.getString(1),rs.getLong(2)),user.id());
             if(rows.size()!=1) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Authenticator enrollment required");
             Factor f=rows.get(0);
-            byte[] secret=HexFormat.of().parseHex(f.secret());
+            byte[] secret=HexFormat.of().parseHex(cipher.decrypt(f.secret()));
             long counter=verifier.matchedCounter(secret,code,f.counter());
             if(counter<0) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Invalid MFA code");
             jdbc.update("UPDATE auth_totp_factor SET last_counter=? WHERE identity_id=?",
