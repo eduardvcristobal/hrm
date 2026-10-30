@@ -14,6 +14,7 @@ ALTER TABLE personnel_document_metadata
  ADD CONSTRAINT ck_document_hold_delete CHECK(NOT (legal_hold AND deleted_at IS NOT NULL));
 UPDATE personnel_document_metadata SET document_family_id=id WHERE document_family_id IS NULL;
 ALTER TABLE personnel_document_metadata ALTER COLUMN document_family_id SET NOT NULL;
+ALTER TABLE personnel_document_metadata ALTER COLUMN document_family_id SET DEFAULT gen_random_uuid();
 CREATE UNIQUE INDEX uq_document_family_version
  ON personnel_document_metadata(tenant_id,employee_id,document_family_id,version);
 CREATE INDEX ix_document_retention
