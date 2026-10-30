@@ -20,6 +20,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/me").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/security/csrf").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/security/password-reset/request").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/security/password-reset/confirm").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/invitations/accept").permitAll()
                 .requestMatchers("/api/v1/admin/invitations", "/api/v1/admin/invitations/**").hasRole("TENANT_ADMIN")
                 .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").hasRole("TENANT_ADMIN")
