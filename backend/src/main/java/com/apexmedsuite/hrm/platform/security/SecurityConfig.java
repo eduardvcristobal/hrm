@@ -35,8 +35,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/security/password-reset/confirm").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/invitations/accept").permitAll()
                 .requestMatchers("/api/v1/admin/invitations", "/api/v1/admin/invitations/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
-                .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").hasRole("TENANT_ADMIN")
-                .requestMatchers("/api/v1/companies", "/api/v1/companies/**").hasRole("TENANT_ADMIN")
+                .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
+                .requestMatchers("/api/v1/companies", "/api/v1/companies/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
                 .anyRequest().denyAll())
             .build();
     }
