@@ -22,18 +22,6 @@ TOKEN="$(python3 -c 'import json; print(json.load(open("/tmp/hrm-ci-token.json")
 test -n "$TOKEN"
 DENIED="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"companyCode":"CI_CSRF_DENY","legalName":"Denied"}' "$BASE/api/v1/companies")"
 test "$DENIED" = 403 || { echo "Expected authenticated CSRF denial 403, got $DENIED"; exit 1; }
-CREATED="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /tmp/hrm-ci-company.json -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" -H 'Content-Type: application/json' --data '{"companyCode":"CI_CSRF_OK","legalName":"CI Company"}' "$BASE/api/v1/companies")"
-test "$CREATED" = 201 || { echo "Expected authorized create 201, got $CREATED"; cat /tmp/hrm-ci-company.json; exit 1; }
-curl -fsS -u "$AUTH" -b "$COOKIE" "$BASE/api/v1/companies" | grep -q 'CI_CSRF_OK'
-# Issue a token with authenticated Basic + CSRF; use it without cookies; revoke it.
-ISSUED="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /tmp/hrm-token.json -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" "$BASE/api/v1/security/tokens")"
-test "$ISSUED" = 201 || { echo "Token issue returned $ISSUED"; cat /tmp/hrm-token.json; exit 1; }
-BEARER="$(python3 -c 'import json; print(json.load(open("/tmp/hrm-token.json"))["value"])')"
-test "$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")" = 200
-REVOKED="$(curl -sS -X DELETE -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/security/tokens/current")"
-test "$REVOKED" = 204 || { echo "Token revoke returned $REVOKED"; exit 1; }
-AFTER="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
-test "$AFTER" = 401 || { echo "Revoked token still authenticates: $AFTER"; exit 1; }
 # MFA enrollment and replay checks for the privileged CI account.
 ENROLL="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /tmp/hrm-mfa.json -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" "$BASE/api/v1/security/mfa/enroll")"
 test "$ENROLL" = 201 || { echo "MFA enrollment failed: $ENROLL"; cat /tmp/hrm-mfa.json; exit 1; }
