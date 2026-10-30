@@ -67,6 +67,18 @@ public class HrCaseController {
             if(pending.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Pending case not found");
             Pending p=pending.get(0);
             if(p.requestedBy().equals(user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Independent decision required");
+            if(decision.equals("APPROVED") && p.type().equals("ONBOARDING")) {
+                Integer count=jdbc.queryForObject("""
+                    SELECT count(*) FROM personnel_onboarding_requirement
+                    WHERE tenant_id=? AND hr_case_id=? AND mandatory
+                    """,Integer.class,user.tenantId(),caseId);
+                Integer incomplete=jdbc.queryForObject("""
+                    SELECT count(*) FROM personnel_onboarding_requirement
+                    WHERE tenant_id=? AND hr_case_id=? AND mandatory AND status<>'VERIFIED'
+                    """,Integer.class,user.tenantId(),caseId);
+                if(count==null||count==0||incomplete!=null&&incomplete>0)
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,"Mandatory onboarding requirements not verified");
+            }
             if(decision.equals("APPROVED") && p.type().equals("SEPARATION")) {
                 if(status.equals("TERMINATED")||status.equals("RETIRED"))
                     throw new ResponseStatusException(HttpStatus.CONFLICT,"Employee already separated");
