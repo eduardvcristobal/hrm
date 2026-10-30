@@ -6,6 +6,7 @@ const TOKEN_KEY='apexHrm.accessToken';
 type Shift={id:string;companyId:string;code:string;name:string;start:string;end:string;timezone:string;active:boolean};
 type Schedule={id:string;shiftId:string;from:string;until:string|null;weekdaysMask:number};
 type Session={id:string;clockInAt:string;clockOutAt:string|null;source:string};
+type DailySummary={day:string;completedMinutes:number;openSessions:number};
 async function api<T>(path:string,options:RequestInit={}):Promise<T>{
   const token=localStorage.getItem(TOKEN_KEY);
   if(!token)throw new Error('Sign in and verify MFA before accessing timekeeping.');
@@ -30,6 +31,9 @@ export default function TimekeepingPage(){
   const [shifts,setShifts]=useState<Shift[]>([]);
   const [schedules,setSchedules]=useState<Schedule[]>([]);
   const [sessions,setSessions]=useState<Session[]>([]);
+  const [summaryFrom,setSummaryFrom]=useState('2026-10-01');
+  const [summaryTo,setSummaryTo]=useState('2026-10-31');
+  const [summaries,setSummaries]=useState<DailySummary[]>([]);
   const [notice,setNotice]=useState('');
   const [busy,setBusy]=useState(false);
   async function run(work:()=>Promise<void>){
@@ -50,6 +54,11 @@ export default function TimekeepingPage(){
       api<Session[]>(`/employees/${key}/attendance`)
     ]);
     setSchedules(scheduleRows);setSessions(sessionRows);
+  }
+  async function loadSummary(){
+    if(!employeeId)throw new Error('Employee ID required');
+    const query=new URLSearchParams({from:summaryFrom,to:summaryTo,timezone});
+    setSummaries(await api<DailySummary[]>(`/employees/${encodeURIComponent(employeeId)}/summaries?${query}`));
   }
   function submitShift(event:FormEvent){
     event.preventDefault();
@@ -96,5 +105,6 @@ export default function TimekeepingPage(){
       <section className="timekeeping-card"><h2>Assign schedule</h2><form onSubmit={submitSchedule}><label>Shift<select required value={shiftId} onChange={e=>setShiftId(e.target.value)}><option value="">Choose a shift</option>{shifts.map(s=><option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}</select></label><div className="timekeeping-grid"><label>Effective from<input type="date" required value={from} onChange={e=>setFrom(e.target.value)}/></label><label>Effective until<input type="date" value={until} onChange={e=>setUntil(e.target.value)}/></label></div><label>Working days<select value={weekdaysMask} onChange={e=>setWeekdaysMask(Number(e.target.value))}><option value={31}>Monday–Friday</option><option value={63}>Monday–Saturday</option><option value={127}>Every day</option></select></label><button disabled={busy||!employeeId||!shiftId}>Assign schedule</button></form><ul>{schedules.map(s=><li key={s.id}>{s.from} to {s.until||'ongoing'} — {s.weekdaysMask===31?'Weekdays':s.weekdaysMask===63?'Monday–Saturday':'Selected days'}</li>)}</ul></section>
     </div>
     <section className="timekeeping-card"><h2>Attendance sessions</h2><button disabled={busy||!employeeId} onClick={clockIn}>Clock in employee</button><div className="timekeeping-table-wrap"><table><thead><tr><th>Clock in</th><th>Clock out</th><th>Source</th><th>Action</th></tr></thead><tbody>{sessions.map(s=><tr key={s.id}><td>{new Date(s.clockInAt).toLocaleString()}</td><td>{s.clockOutAt?new Date(s.clockOutAt).toLocaleString():'Open'}</td><td>{s.source}</td><td>{!s.clockOutAt&&<button disabled={busy} onClick={()=>clockOut(s.id)}>Clock out</button>}</td></tr>)}</tbody></table></div></section>
+    <section className="timekeeping-card"><h2>Daily attendance totals</h2><p>Raw completed elapsed minutes, grouped by the local clock-in date. Not a paid-time or overtime calculation.</p><div className="timekeeping-grid"><label>From<input type="date" value={summaryFrom} onChange={e=>setSummaryFrom(e.target.value)}/></label><label>To<input type="date" value={summaryTo} onChange={e=>setSummaryTo(e.target.value)}/></label></div><button disabled={busy||!employeeId} onClick={()=>void run(loadSummary)}>Load daily totals</button><div className="timekeeping-table-wrap"><table><thead><tr><th>Date</th><th>Completed elapsed minutes</th><th>Open sessions</th></tr></thead><tbody>{summaries.map(d=><tr key={d.day}><td>{d.day}</td><td>{d.completedMinutes}</td><td>{d.openSessions}</td></tr>)}</tbody></table></div></section>
   </main>;
 }
