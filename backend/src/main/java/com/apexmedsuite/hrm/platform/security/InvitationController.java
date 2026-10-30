@@ -52,6 +52,10 @@ public class InvitationController {
         Instant expiry=Instant.now().plusSeconds(48*3600);
         return tenants.inTenant(actor.tenantId(),()->{
             String email=input.email().trim().toLowerCase(Locale.ROOT);
+            Integer existing=jdbc.queryForObject("SELECT count(*) FROM auth_identity WHERE email=?",
+                Integer.class,email);
+            if(existing!=null && existing>0)
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"Account already exists");
             jdbc.update("""
               INSERT INTO auth_invitation(tenant_id,email,role,token_sha256,expires_at,created_by)
               VALUES (?,?,?,?,?,?)
@@ -78,6 +82,10 @@ public class InvitationController {
                 digest(input.token()));
         if(invites.size()!=1) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid or expired invitation");
         InviteRow invite=invites.get(0);
+        Integer existing=jdbc.queryForObject("SELECT count(*) FROM auth_identity WHERE email=?",
+            Integer.class,invite.email());
+        if(existing!=null && existing>0)
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Account already exists");
         UUID id=UUID.randomUUID();
         jdbc.update("""
            INSERT INTO auth_identity(id,tenant_id,email,password_hash,enabled)
@@ -85,6 +93,10 @@ public class InvitationController {
            """,id,invite.tenant(),invite.email(),passwords.encode(input.password()));
         jdbc.update("INSERT INTO auth_identity_role(identity_id,role) VALUES (?,?)",id,invite.role());
         jdbc.update("UPDATE auth_invitation SET used_at=now() WHERE id=?",invite.id());
+        jdbc.update("""
+            INSERT INTO audit_event(tenant_id,actor_id,action,entity_type,entity_id)
+            VALUES (?,?,'INVITATION_ACCEPTED','auth_identity',?)
+            """,invite.tenant(),id,id);
     }
     private record InviteRow(UUID id,UUID tenant,String email,String role) {}
 }
