@@ -14,14 +14,16 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 public class SecurityConfig {
     @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(12); }
-    @Bean SecurityFilterChain securityFilterChain(HttpSecurity http, JdbcTemplate jdbc) throws Exception {
+    @Bean SecurityFilterChain securityFilterChain(HttpSecurity http, JdbcTemplate jdbc, ApiTokenService tokens) throws Exception {
         return http
             .addFilterBefore(new LoginThrottleFilter(jdbc), BasicAuthenticationFilter.class)
+            .addFilterBefore(new BearerTokenFilter(tokens), BasicAuthenticationFilter.class)
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
             .httpBasic(basic -> {})
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/me").authenticated()
+                .requestMatchers("/api/v1/security/tokens", "/api/v1/security/tokens/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/security/csrf").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/security/password-reset/request").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/security/password-reset/confirm").permitAll()
