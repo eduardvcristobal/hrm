@@ -15,6 +15,8 @@ GRANT USAGE ON SCHEMA public TO hrm_runtime;
 GRANT SELECT ON tenant TO hrm_runtime;
 GRANT SELECT,UPDATE(enabled) ON auth_identity TO hrm_runtime;
 GRANT SELECT,INSERT,DELETE ON auth_identity_role TO hrm_runtime;
+GRANT SELECT,INSERT ON auth_identity TO hrm_runtime;
+GRANT SELECT,INSERT,UPDATE(used_at) ON auth_invitation TO hrm_runtime;
 GRANT SELECT,INSERT,UPDATE ON company,branch TO hrm_runtime;
 GRANT SELECT,INSERT ON audit_event TO hrm_runtime;
 GRANT USAGE,SELECT ON SEQUENCE audit_event_id_seq TO hrm_runtime;
