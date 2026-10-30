@@ -15,11 +15,13 @@ public final class MfaSecretCipher {
     private static final SecureRandom RANDOM = new SecureRandom();
     private final SecretKeySpec key;
     private final SecretKeySpec previousKey;
+    @org.springframework.beans.factory.annotation.Autowired
     public MfaSecretCipher(@Value("${HRM_MFA_ENCRYPTION_KEY:}") String encoded,
             @Value("${HRM_MFA_PREVIOUS_ENCRYPTION_KEY:}") String previous) {
         this.previousKey = parseKey(previous);
         this.key=parseKey(encoded);
     }
+    public MfaSecretCipher(String encoded) { this(encoded, ""); }
     private static SecretKeySpec parseKey(String encoded) {
         if(encoded == null || encoded.isBlank()) return null;
         byte[] raw=Base64.getDecoder().decode(encoded);
