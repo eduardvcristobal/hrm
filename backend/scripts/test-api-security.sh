@@ -102,6 +102,11 @@ SEPARATION="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{htt
 test "$SEPARATION" = 201 || { echo "Separation failed: $SEPARATION"; exit 1; }
 REHIRE_REQUEST="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-rehire.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"effectiveDate":"2026-09-01","employmentType":"REGULAR","reason":"CI rehire request"}' "$BASE/api/v1/personnel/employees/$EMP_ID/rehire-requests")"
 test "$REHIRE_REQUEST" = 201 || { echo "Rehire request failed: $REHIRE_REQUEST"; cat /tmp/hrm-rehire.json; exit 1; }
+REHIRE_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-rehire.json"))["id"])')"
+SELF_APPROVAL="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/personnel/employees/$EMP_ID/rehire-requests/$REHIRE_ID/approve")"
+test "$SELF_APPROVAL" = 403 || { echo "Same-actor rehire approval allowed: $SELF_APPROVAL"; exit 1; }
+GENERIC_REHIRE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"effectiveDate":"2026-09-01","status":"ACTIVE","type":"REGULAR","reason":"Attempted bypass"}' "$BASE/api/v1/personnel/employees/$EMP_ID/employment")"
+{ test "$GENERIC_REHIRE" = 403 || test "$GENERIC_REHIRE" = 409; } || { echo "Generic rehire bypass allowed: $GENERIC_REHIRE"; exit 1; }
 REVOKED="$(curl -sS -X DELETE -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/security/tokens/current")"
 test "$REVOKED" = 204 || { echo "Token revoke returned $REVOKED"; exit 1; }
 AFTER="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
