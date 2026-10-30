@@ -73,6 +73,9 @@ BASIC_SALARY="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%
 test "$BASIC_SALARY" = 403 || { echo "Basic-only credentials accessed compensation: $BASIC_SALARY"; exit 1; }
 ANON_SALARY="$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/api/v1/personnel/employees/$EMP_ID/compensation")"
 { test "$ANON_SALARY" = 401 || test "$ANON_SALARY" = 403; } || { echo "Anonymous compensation access: $ANON_SALARY"; exit 1; }
+PROFILE_PATCH="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-profile.json -w '%{http_code}' -X PATCH -H 'Content-Type: application/json' --data '{"middleName":"Initial","preferredName":"Team Member","suffix":null}' "$BASE/api/v1/personnel/employees/$EMP_ID/profile")"
+test "$PROFILE_PATCH" = 200 || { echo "Profile update failed: $PROFILE_PATCH"; cat /tmp/hrm-ci-profile.json; exit 1; }
+curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees/$EMP_ID/profile" | grep -q 'Team Member'
 REVOKED="$(curl -sS -X DELETE -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/security/tokens/current")"
 test "$REVOKED" = 204 || { echo "Token revoke returned $REVOKED"; exit 1; }
 AFTER="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
