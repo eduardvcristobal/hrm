@@ -34,13 +34,13 @@ BEGIN
  END IF;
 END $$;
 -- Cross-tenant updates must not touch B, and inserts for B must be rejected.
-DO $
+DO $rls$
 DECLARE changed integer;
 BEGIN
  UPDATE company SET legal_name='SHOULD_NOT_CHANGE' WHERE company_code='RLS_B';
  GET DIAGNOSTICS changed = ROW_COUNT;
  IF changed <> 0 THEN RAISE EXCEPTION 'Cross-tenant update succeeded'; END IF;
-END $;
+END $rls$;
 -- Missing setting must fail closed.
 SELECT set_config('app.tenant_id','',true);
 DO $$
