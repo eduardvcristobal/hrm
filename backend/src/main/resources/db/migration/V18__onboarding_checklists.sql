@@ -1,3 +1,5 @@
+ALTER TABLE personnel_hr_case ADD CONSTRAINT uq_hr_case_tenant_id UNIQUE(tenant_id,id);
+ALTER TABLE personnel_document_metadata ADD CONSTRAINT uq_document_tenant_id UNIQUE(tenant_id,id);
 CREATE TABLE personnel_onboarding_requirement (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  tenant_id uuid NOT NULL,
@@ -17,8 +19,6 @@ CREATE TABLE personnel_onboarding_requirement (
   (status='PENDING' AND verified_by IS NULL AND verified_at IS NULL)
   OR (status IN ('VERIFIED','REJECTED') AND verified_by IS NOT NULL AND verified_at IS NOT NULL))
 );
-ALTER TABLE personnel_hr_case ADD CONSTRAINT uq_hr_case_tenant_id UNIQUE(tenant_id,id);
-ALTER TABLE personnel_document_metadata ADD CONSTRAINT uq_document_tenant_id UNIQUE(tenant_id,id);
 ALTER TABLE personnel_onboarding_requirement ENABLE ROW LEVEL SECURITY;
 ALTER TABLE personnel_onboarding_requirement FORCE ROW LEVEL SECURITY;
 CREATE POLICY onboarding_requirement_tenant ON personnel_onboarding_requirement
