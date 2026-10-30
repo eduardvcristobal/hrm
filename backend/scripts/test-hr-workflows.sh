@@ -54,3 +54,12 @@ SELF_REVIEW="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{ht
 test "$SELF_REVIEW" = 403 || { echo "Document uploader self-reviewed: $SELF_REVIEW"; exit 1; }
 ANON_DOCUMENT="$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/content")"
 { test "$ANON_DOCUMENT" = 401 || test "$ANON_DOCUMENT" = 403; } || { echo "Anonymous document access allowed: $ANON_DOCUMENT"; exit 1; }
+
+LIFECYCLE_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-lifecycle.json -w '%{http_code}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/lifecycle")"
+test "$LIFECYCLE_STATUS" = 200 || { echo "Lifecycle read failed: $LIFECYCLE_STATUS"; exit 1; }
+HOLD_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-held.json -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data '{"enabled":true,"reason":"CI legal hold"}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/hold")"
+test "$HOLD_STATUS" = 200 || { echo "Legal hold failed: $HOLD_STATUS"; exit 1; }
+TOMBSTONE_DENIED="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/tombstone")"
+test "$TOMBSTONE_DENIED" = 409 || { echo "Held document could be deleted: $TOMBSTONE_DENIED"; exit 1; }
+RETENTION_DENIED="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data '{"retainUntil":"2027-12-31"}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/retention")"
+test "$RETENTION_DENIED" = 409 || { echo "Held document retention changed: $RETENTION_DENIED"; exit 1; }
