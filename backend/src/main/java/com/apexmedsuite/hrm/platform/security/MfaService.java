@@ -51,7 +51,7 @@ public class MfaService {
             Factor f=rows.get(0);
             if(!verifier.verify(HexFormat.of().parseHex(cipher.decrypt(f.secret())),code,f.counter()))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid code");
-            long counter=verifier.matchedCounter(HexFormat.of().parseHex(f.secret()),code,f.counter());
+            long counter=verifier.matchedCounter(HexFormat.of().parseHex(cipher.decrypt(f.secret())),code,f.counter());
             jdbc.update("""
                 UPDATE auth_totp_factor SET enabled=true,last_counter=? WHERE identity_id=?
                 """,counter,user.id());
