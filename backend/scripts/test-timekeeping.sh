@@ -36,3 +36,12 @@ BAD_SUMMARY="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{ht
 { test "$BAD_SUMMARY" = 400 || test "$BAD_SUMMARY" = 403; } || { echo "Overlong report accepted: $BAD_SUMMARY"; exit 1; }
 BAD_ZONE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/timekeeping/employees/$EMP_ID/summaries?from=2026-10-01&to=2026-10-31&timezone=BadZone")"
 { test "$BAD_ZONE" = 400 || test "$BAD_ZONE" = 403; } || { echo "Invalid timezone accepted: $BAD_ZONE"; exit 1; }
+
+
+CORRECTION_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-correction.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"clockInAt":"2026-10-29T08:00:00Z","clockOutAt":"2026-10-29T17:00:00Z","reason":"Attendance time adjustment test"}' "$BASE/api/v1/timekeeping/employees/$EMP_ID/attendance/$SESSION_ID/corrections")"
+test "$CORRECTION_STATUS" = 201 || { echo "Correction request failed: $CORRECTION_STATUS"; cat /tmp/hrm-correction.json; exit 1; }
+CORRECTION_ID="$(python3 -c 'import json; x=json.load(open("/tmp/hrm-correction.json"));assert x["status"]=="PENDING";print(x["id"])')"
+CORRECTION_SELF="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/timekeeping/employees/$EMP_ID/attendance/$SESSION_ID/corrections/$CORRECTION_ID/decision?decision=APPROVED")"
+test "$CORRECTION_SELF" = 403 || { echo "Self approval of attendance correction accepted: $CORRECTION_SELF"; exit 1; }
+DUP_CORRECTION="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"clockInAt":"2026-10-29T09:00:00Z","clockOutAt":"2026-10-29T18:00:00Z","reason":"Duplicate correction attempt"}' "$BASE/api/v1/timekeeping/employees/$EMP_ID/attendance/$SESSION_ID/corrections")"
+{ test "$DUP_CORRECTION" = 403 || test "$DUP_CORRECTION" = 409; } || { echo "Concurrent pending correction allowed: $DUP_CORRECTION"; exit 1; }
