@@ -54,6 +54,7 @@ public class UserAdministrationController {
     public void removeRole(@PathVariable UUID id,@PathVariable Role role,
             @AuthenticationPrincipal HrmUserPrincipal actor) {
         tenants.inTenant(actor.tenantId(),()->{
+            lockTenantAdministration(actor.tenantId());
             requireUser(actor,id);
             if (role == Role.TENANT_ADMIN) guardLastAdmin(actor,id);
             jdbc.update("DELETE FROM auth_identity_role WHERE identity_id=? AND role=?",id,role.name());
@@ -67,6 +68,7 @@ public class UserAdministrationController {
     public void changeStatus(@PathVariable UUID id,@Valid @RequestBody StatusChange input,
             @AuthenticationPrincipal HrmUserPrincipal actor) {
         tenants.inTenant(actor.tenantId(),()->{
+            lockTenantAdministration(actor.tenantId());
             requireUser(actor,id);
             if (!input.enabled()) guardLastAdmin(actor,id);
             jdbc.update("UPDATE auth_identity SET enabled=? WHERE tenant_id=? AND id=?",
@@ -74,6 +76,12 @@ public class UserAdministrationController {
             audit(actor,id,"USER_STATUS_CHANGED");
             return null;
         });
+    }
+
+    // Serialize administrative changes per tenant so concurrent requests cannot bypass last-admin checks.
+    private void lockTenantAdministration(UUID tenantId) {
+        jdbc.queryForObject("SELECT pg_advisory_xact_lock(hashtextextended(?, 91237))",
+            (rs, row) -> rs.getObject(1), tenantId.toString());
     }
 
     private void requireUser(HrmUserPrincipal actor, UUID id) {
