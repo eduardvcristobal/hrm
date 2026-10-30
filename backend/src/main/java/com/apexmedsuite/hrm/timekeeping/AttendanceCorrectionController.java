@@ -51,8 +51,8 @@ public class AttendanceCorrectionController {
                  (tenant_id,employee_id,session_id,old_clock_in,old_clock_out,new_clock_in,new_clock_out,reason,requested_by)
                 VALUES(?,?,?,?,?,?,?,?,?)
                 RETURNING id,session_id,status,requested_by,reviewed_by,new_clock_in,new_clock_out
-                """,(rs,n)->row(rs),user.tenantId(),employeeId,sessionId,old.start(),old.end(),
-                    input.clockInAt(),input.clockOutAt(),input.reason().trim(),user.id());
+                """,(rs,n)->row(rs),user.tenantId(),employeeId,sessionId,java.sql.Timestamp.from(old.start()),java.sql.Timestamp.from(old.end()),
+                    java.sql.Timestamp.from(input.clockInAt()),java.sql.Timestamp.from(input.clockOutAt()),input.reason().trim(),user.id());
             audit(user,"TIME_CORRECTION_REQUESTED",result.id());
             return result;
         });
@@ -82,7 +82,7 @@ public class AttendanceCorrectionController {
                 jdbc.update("""
                     UPDATE time_attendance_session SET clock_in_at=?,clock_out_at=?
                     WHERE tenant_id=? AND employee_id=? AND id=? AND clock_out_at IS NOT NULL
-                    """,row.newIn(),row.newOut(),user.tenantId(),employeeId,sessionId);
+                    """,java.sql.Timestamp.from(row.newIn()),java.sql.Timestamp.from(row.newOut()),user.tenantId(),employeeId,sessionId);
             }
             Correction result=jdbc.queryForObject("""
                 UPDATE time_attendance_correction SET status=?,reviewed_by=?,reviewed_at=now()
