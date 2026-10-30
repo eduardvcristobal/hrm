@@ -78,6 +78,8 @@ public class DocumentContentController {
            ||filename.contains("..")||!filename.toLowerCase(java.util.Locale.ROOT).endsWith(".pdf"))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid filename");
         return tenants.inTenant(user.tenantId(),()->{
+            jdbc.query("SELECT id FROM personnel_employee WHERE tenant_id=? AND id=? FOR UPDATE",
+                (rs,i)->rs.getObject(1,UUID.class),user.tenantId(),employeeId);
             List<Object[]> parent=jdbc.query("""
                 SELECT document_family_id,category,version,legal_hold,retain_until FROM personnel_document_metadata
                 WHERE tenant_id=? AND employee_id=? AND id=? AND deleted_at IS NULL FOR UPDATE
@@ -86,9 +88,8 @@ public class DocumentContentController {
                      user.tenantId(),employeeId,documentId);
             if(parent.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Document not found");
             Object[] p=parent.get(0);
-            // Serialize all replacements within a tenant/employee, even when two historical IDs are used.
-            jdbc.query("SELECT id FROM personnel_employee WHERE tenant_id=? AND id=? FOR UPDATE",
-                (rs,i)->rs.getObject(1,UUID.class),user.tenantId(),employeeId);
+            if(Boolean.TRUE.equals(p[3]))
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"Legal hold prohibits version replacement");
             Integer latest=jdbc.queryForObject("""
                 SELECT max(version) FROM personnel_document_metadata
                 WHERE tenant_id=? AND employee_id=? AND document_family_id=?
