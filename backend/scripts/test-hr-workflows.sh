@@ -12,3 +12,12 @@ test "$HR_SELF_CODE" = 403 || { echo "HR self-approval not blocked: $HR_SELF_COD
 DOC_CODE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-document.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"category":"ONBOARDING","filename":"checklist.pdf","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sizeBytes":512}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents")"
 test "$DOC_CODE" = 201 || { echo "Document metadata registration failed: $DOC_CODE"; cat /tmp/hrm-ci-document.json; exit 1; }
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees/$EMP_ID/documents" | grep -q 'checklist.pdf'
+
+SEPARATION_CASE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-sep-case.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"type":"SEPARATION","effectiveDate":"2026-09-02","reason":"CI exit clearance"}' "$BASE/api/v1/personnel/employees/$EMP_ID/hr-cases")"
+test "$SEPARATION_CASE" = 201 || { echo "Separation case failed: $SEPARATION_CASE"; cat /tmp/hrm-ci-sep-case.json; exit 1; }
+SEPARATION_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-ci-sep-case.json"))["id"])')"
+CLEARANCE_CODE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-clearance.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"code":"PROPERTY_RETURN","label":"Property return","required":true}' "$BASE/api/v1/personnel/employees/$EMP_ID/hr-cases/$SEPARATION_ID/clearances")"
+test "$CLEARANCE_CODE" = 201 || { echo "Exit clearance creation failed: $CLEARANCE_CODE"; cat /tmp/hrm-ci-clearance.json; exit 1; }
+CLEARANCE_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-ci-clearance.json"))["id"])')"
+REVIEW_CODE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-reviewed.json -w '%{http_code}' -X PATCH -H 'Content-Type: application/json' --data '{"status":"CLEARED"}' "$BASE/api/v1/personnel/employees/$EMP_ID/hr-cases/$SEPARATION_ID/clearances/$CLEARANCE_ID")"
+test "$REVIEW_CODE" = 200 || { echo "Clearance review failed: $REVIEW_CODE"; cat /tmp/hrm-ci-reviewed.json; exit 1; }
