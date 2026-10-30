@@ -35,6 +35,7 @@ GRANT SELECT,INSERT,UPDATE(status,evidence_document_id,verified_by,verified_at) 
 GRANT SELECT,INSERT,UPDATE(status,reviewed_by,reviewed_at) ON personnel_separation_clearance TO hrm_runtime;
 GRANT SELECT,INSERT ON personnel_final_pay_handoff TO hrm_runtime;
 GRANT SELECT,INSERT,UPDATE(status,resolved_by,resolved_at) ON personnel_separation_asset TO hrm_runtime;
+GRANT SELECT,INSERT,UPDATE(enabled,minimum_wait_days,updated_by,updated_at) ON personnel_rehire_policy TO hrm_runtime;
 GRANT SELECT,INSERT ON audit_event TO hrm_runtime;
 GRANT USAGE,SELECT ON SEQUENCE audit_event_id_seq TO hrm_runtime;
 REVOKE CREATE ON SCHEMA public FROM hrm_runtime;
