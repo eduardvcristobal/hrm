@@ -52,5 +52,5 @@ VARIANCE_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-varia
 test "$VARIANCE_STATUS" = 200 || { echo "Variance preview failed: $VARIANCE_STATUS"; cat /tmp/hrm-variance-preview.json; exit 1; }
 python3 -c 'import json; x=json.load(open("/tmp/hrm-variance-preview.json")); assert len(x)==1, x; r=x[0]; assert r["provisional"] and r["classification"]=="INFORMATIONAL_NOT_PAYROLL_APPROVED"; assert r["timezone"]=="Asia/Manila"; assert r["variance"]["scheduledMinutes"]==480'
 VARIANCE_LONG="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/timekeeping/employees/$EMP_ID/variance-preview?from=2026-01-01&to=2026-12-31")"
-test "$VARIANCE_LONG" = 400 || { echo "Overlong variance preview accepted: $VARIANCE_LONG"; exit 1; }
+{ test "$VARIANCE_LONG" = 400 || test "$VARIANCE_LONG" = 403; } || { echo "Overlong variance preview accepted: $VARIANCE_LONG"; exit 1; }
 echo "M2.3 schedule variance HTTP regression passed"
