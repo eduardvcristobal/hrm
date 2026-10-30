@@ -29,7 +29,7 @@ public class LoginThrottleFilter extends OncePerRequestFilter {
             response.setHeader("Retry-After","600");
             response.setStatus(429);
             response.setContentType("application/problem+json");
-            response.getWriter().write("{\\"title\\":\\"Too Many Requests\\",\\"status\\":429}");
+            response.getWriter().write("{\"title\":\"Too Many Requests\",\"status\":429}");
             return;
         }
         // Count attempted Basic authentication before invoking Spring Security:
