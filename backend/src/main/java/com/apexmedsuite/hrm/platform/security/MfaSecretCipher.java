@@ -44,12 +44,22 @@ public final class MfaSecretCipher {
             throw new IllegalStateException("Unsupported MFA secret format");
         try {
             String[] parts=payload.split(":",3);
+            if(parts.length!=3) throw new IllegalStateException("Invalid MFA envelope");
             byte[] iv=Base64.getDecoder().decode(parts[1]);
             if(iv.length != 12) throw new IllegalStateException("Invalid MFA IV");
-            Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");
-            SecretKeySpec candidate=payload.startsWith("v1:") && previousKey!=null ? previousKey : key;
-            cipher.init(Cipher.DECRYPT_MODE,candidate,new GCMParameterSpec(128,iv));
-            return new String(cipher.doFinal(Base64.getDecoder().decode(parts[2])),StandardCharsets.UTF_8);
+            byte[] encrypted=Base64.getDecoder().decode(parts[2]);
+            try {
+                return decryptWith(key,iv,encrypted);
+            } catch(javax.crypto.AEADBadTagException noMatch) {
+                // Previous key exists only during a carefully controlled rotation window.
+                if(previousKey==null) throw noMatch;
+                return decryptWith(previousKey,iv,encrypted);
+            }
         } catch(Exception ex){throw new IllegalStateException("MFA secret cannot be decrypted",ex);}
+    }
+    private static String decryptWith(SecretKeySpec key,byte[] iv,byte[] encrypted) throws Exception {
+        Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.DECRYPT_MODE,key,new GCMParameterSpec(128,iv));
+        return new String(cipher.doFinal(encrypted),StandardCharsets.UTF_8);
     }
 }
