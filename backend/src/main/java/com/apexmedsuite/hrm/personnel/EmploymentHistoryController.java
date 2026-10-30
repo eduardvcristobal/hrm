@@ -46,13 +46,22 @@ public class EmploymentHistoryController {
     public EmploymentEvent change(@AuthenticationPrincipal HrmUserPrincipal user,@PathVariable UUID employeeId,
             @Valid @RequestBody ChangeEmployment input) {
         return tenants.inTenant(user.tenantId(),()->{
-            List<LocalDate> hires=jdbc.query("""
-                SELECT hire_date FROM personnel_employee
+            List<EmployeeState> hires=jdbc.query("""
+                SELECT hire_date,employment_status,employment_type FROM personnel_employee
                 WHERE tenant_id=? AND id=? FOR UPDATE
-                """,(rs,i)->rs.getObject(1,LocalDate.class),user.tenantId(),employeeId);
+                """,(rs,i)->new EmployeeState(rs.getObject(1,LocalDate.class),rs.getString(2),rs.getString(3)),user.tenantId(),employeeId);
             if(hires.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Employee not found");
-            if(input.effectiveDate().isBefore(hires.get(0)))
+            if(input.effectiveDate().isBefore(hires.get(0).hireDate()))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Employment change predates hire");
+            String previous=hires.get(0).status();
+            String next=input.status();
+            if ((previous.equals("TERMINATED") || previous.equals("RETIRED")) && !next.equals("ACTIVE"))
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"Separated employee requires rehire");
+            if (previous.equals("RETIRED") && next.equals("ACTIVE"))
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"Retired employee requires separate rehire case");
+            if (previous.equals("ACTIVE") && next.equals("ACTIVE")
+                && hires.get(0).type().equals(input.type()))
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"No lifecycle transition");
             LocalDate latest=jdbc.queryForObject("""
                 SELECT max(effective_date) FROM personnel_employment_history
                 WHERE tenant_id=? AND employee_id=?
@@ -77,6 +86,7 @@ public class EmploymentHistoryController {
             return event;
         });
     }
+    private record EmployeeState(LocalDate hireDate,String status,String type) {}
     private void ensureEmployee(UUID tenantId,UUID employeeId) {
         Integer exists=jdbc.queryForObject("""
             SELECT count(*) FROM personnel_employee WHERE tenant_id=? AND id=?
