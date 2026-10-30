@@ -31,6 +31,7 @@ GRANT SELECT,INSERT,UPDATE(status,approved_by,approved_at,cancelled_by,cancelled
 GRANT SELECT,INSERT,UPDATE ON personnel_private_data TO hrm_runtime;
 GRANT SELECT,INSERT,UPDATE(status,decided_by,decided_at) ON personnel_hr_case TO hrm_runtime;
 GRANT SELECT,INSERT ON personnel_document_metadata TO hrm_runtime;
+GRANT SELECT,INSERT ON personnel_document_content TO hrm_runtime;
 GRANT SELECT,INSERT,UPDATE(status,evidence_document_id,verified_by,verified_at) ON personnel_onboarding_requirement TO hrm_runtime;
 GRANT SELECT,INSERT,UPDATE(status,reviewed_by,reviewed_at) ON personnel_separation_clearance TO hrm_runtime;
 GRANT SELECT,INSERT ON personnel_final_pay_handoff TO hrm_runtime;
