@@ -14,9 +14,9 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 public class SecurityConfig {
     @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(12); }
-    @Bean SecurityFilterChain securityFilterChain(HttpSecurity http, JdbcTemplate jdbc, ApiTokenService tokens) throws Exception {
+    @Bean SecurityFilterChain securityFilterChain(HttpSecurity http, JdbcTemplate jdbc, ApiTokenService tokens, DatabaseUserDetailsService users, PasswordEncoder encoder) throws Exception {
         return http
-            .addFilterBefore(new LoginThrottleFilter(jdbc), BasicAuthenticationFilter.class)
+            .addFilterBefore(new LoginThrottleFilter(jdbc, users, encoder), BasicAuthenticationFilter.class)
             .addFilterBefore(new BearerTokenFilter(tokens), BasicAuthenticationFilter.class)
             .csrf(csrf -> csrf.ignoringRequestMatchers(request -> {
                 String header = request.getHeader("Authorization");
