@@ -35,6 +35,11 @@ REPLAY="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_
 { test "$REPLAY" = 401 || test "$REPLAY" = 403; } || { echo "MFA replay not blocked: $REPLAY"; exit 1; }
 UNVERIFIED="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" "$BASE/api/v1/security/tokens")"
 { test "$UNVERIFIED" = 401 || test "$UNVERIFIED" = 403; } || { echo "MFA-less issuance not blocked: $UNVERIFIED"; exit 1; }
+NEXTOTP="$(python3 -c 'import os,hmac,hashlib,struct; k=bytes.fromhex(os.environ["SECRET"]); c=int(os.environ["STEP"])+1; d=hmac.new(k,struct.pack(">Q",c),hashlib.sha1).digest(); i=d[-1]&15; print("%06d" % ((struct.unpack(">I",d[i:i+4])[0]&0x7fffffff)%1000000))')"
+ISSUED="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /tmp/hrm-token.json -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" -H "X-TOTP-Code: $NEXTOTP" "$BASE/api/v1/security/tokens")"
+test "$ISSUED" = 201 || { echo "MFA token issue returned $ISSUED"; cat /tmp/hrm-token.json; exit 1; }
+BEARER="$(python3 -c 'import json; print(json.load(open("/tmp/hrm-token.json"))["value"])')"
+test "$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")" = 200
 for i in $(seq 1 10); do
   BAD="$(curl -sS -u 'admin-ci@example.test:incorrect-password' -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
   test "$BAD" = 401 || { echo "Invalid login should return 401, got $BAD"; exit 1; }
