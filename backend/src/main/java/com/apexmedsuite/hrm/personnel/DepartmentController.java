@@ -89,6 +89,49 @@ public class DepartmentController {
             return found.get(0);
         });
     }
+    public record Reparent(UUID parentId) {}
+    @PatchMapping("/{id}/parent")
+    public Department reparent(@AuthenticationPrincipal HrmUserPrincipal user,@PathVariable UUID id,
+                               @RequestBody Reparent input) {
+        return tenants.inTenant(user.tenantId(),()->{
+            jdbc.query("SELECT pg_advisory_xact_lock(hashtext(?))",(rs,n)->rs.getObject(1),
+                "personnel-department-tree:"+user.tenantId());
+            List<Department> current=jdbc.query("""
+                SELECT id,company_id,department_code,department_name,parent_id,active
+                FROM personnel_department WHERE tenant_id=? AND id=? FOR UPDATE
+                """,(rs,n)->map(rs),user.tenantId(),id);
+            if(current.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Department not found");
+            Department existing=current.get(0);
+            if(!existing.active()) throw new ResponseStatusException(HttpStatus.CONFLICT,"Inactive department");
+            if(input.parentId()!=null) {
+                if(id.equals(input.parentId())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Self parent");
+                Integer valid=jdbc.queryForObject("""
+                    SELECT count(*) FROM personnel_department
+                    WHERE tenant_id=? AND company_id=? AND id=? AND active
+                    """,Integer.class,user.tenantId(),existing.companyId(),input.parentId());
+                if(valid==null||valid==0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid parent");
+                Integer cycle=jdbc.queryForObject("""
+                    WITH RECURSIVE descendants(id) AS (
+                      SELECT id FROM personnel_department WHERE tenant_id=? AND company_id=? AND id=?
+                      UNION
+                      SELECT child.id FROM personnel_department child JOIN descendants d ON child.parent_id=d.id
+                      WHERE child.tenant_id=? AND child.company_id=?
+                    ) SELECT count(*) FROM descendants WHERE id=?
+                    """,Integer.class,user.tenantId(),existing.companyId(),id,
+                    user.tenantId(),existing.companyId(),input.parentId());
+                if(cycle!=null&&cycle>0) throw new ResponseStatusException(HttpStatus.CONFLICT,"Department cycle");
+            }
+            Department result=jdbc.queryForObject("""
+                UPDATE personnel_department SET parent_id=? WHERE tenant_id=? AND id=?
+                RETURNING id,company_id,department_code,department_name,parent_id,active
+                """,(rs,n)->map(rs),input.parentId(),user.tenantId(),id);
+            jdbc.update("""
+                INSERT INTO audit_event(tenant_id,actor_id,action,entity_type,entity_id)
+                VALUES(?,?,'DEPARTMENT_REPARENTED','personnel_department',?)
+                """,user.tenantId(),user.id(),id);
+            return result;
+        });
+    }
     public record StatusInput(boolean active) {}
     private static Department map(java.sql.ResultSet rs) throws java.sql.SQLException {
         return new Department(rs.getObject("id",UUID.class),rs.getObject("company_id",UUID.class),
