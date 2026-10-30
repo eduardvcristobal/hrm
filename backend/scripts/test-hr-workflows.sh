@@ -45,8 +45,9 @@ printf '%s' '%PDF-1.4 dummy-ci-only\n%%EOF\n' > /tmp/hrm-document-ci.pdf
 UPLOAD_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-uploaded-document.json -w '%{http_code}' -F 'category=ONBOARDING' -F 'file=@/tmp/hrm-document-ci.pdf;type=application/pdf' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/upload")"
 test "$UPLOAD_STATUS" = 201 || { echo "Document upload failed: $UPLOAD_STATUS"; cat /tmp/hrm-uploaded-document.json; exit 1; }
 DOC_CONTENT_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-uploaded-document.json"))["id"])')"
-DOWNLOAD_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-downloaded-document.pdf -w '%{http_code}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/content")"
-test "$DOWNLOAD_STATUS" = 200 || { echo "Document download failed: $DOWNLOAD_STATUS"; exit 1; }
-cmp /tmp/hrm-document-ci.pdf /tmp/hrm-downloaded-document.pdf
+QUARANTINE_DOWNLOAD="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/content")"
+{ test "$QUARANTINE_DOWNLOAD" = 404 || test "$QUARANTINE_DOWNLOAD" = 403; } || { echo "Quarantined document accessible: $QUARANTINE_DOWNLOAD"; exit 1; }
+SELF_REVIEW="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"status":"RELEASED"}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/review")"
+test "$SELF_REVIEW" = 403 || { echo "Document uploader self-reviewed: $SELF_REVIEW"; exit 1; }
 ANON_DOCUMENT="$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/content")"
 { test "$ANON_DOCUMENT" = 401 || test "$ANON_DOCUMENT" = 403; } || { echo "Anonymous document access allowed: $ANON_DOCUMENT"; exit 1; }
