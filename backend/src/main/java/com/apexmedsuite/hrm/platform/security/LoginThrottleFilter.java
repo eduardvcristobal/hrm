@@ -30,7 +30,21 @@ public class LoginThrottleFilter extends OncePerRequestFilter {
             response.sendError(429,"Too many unsuccessful authentication attempts");
             return;
         }
+        // Count attempted Basic authentication before invoking Spring Security:
+        // failed authentication may exit the chain by an exception path.
+        jdbc.update("""
+            INSERT INTO auth_login_attempt(key_sha256,attempts,window_start,updated_at)
+            VALUES (?,1,now(),now())
+            ON CONFLICT(key_sha256) DO UPDATE
+            SET attempts=CASE WHEN auth_login_attempt.window_start<now()-interval '10 minutes'
+                 THEN 1 ELSE auth_login_attempt.attempts+1 END,
+                window_start=CASE WHEN auth_login_attempt.window_start<now()-interval '10 minutes'
+                 THEN now() ELSE auth_login_attempt.window_start END,
+                updated_at=now()
+            """,key);
         chain.doFilter(request,response);
+        if(response.getStatus()<400)
+            jdbc.update("DELETE FROM auth_login_attempt WHERE key_sha256=?",key);
     }
     static String key(HttpServletRequest request) {
 
