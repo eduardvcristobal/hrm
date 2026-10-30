@@ -40,8 +40,8 @@ test "$ENROLL" = 201 || { echo "MFA enrollment failed: $ENROLL"; cat /tmp/hrm-mf
 SECRET="$(python3 -c 'import json; print(json.load(open("/tmp/hrm-mfa.json"))["secretHex"])')"
 export SECRET
 export STEP="$(python3 -c 'import time; print(int(time.time()//30))')"
-OTP="$(python3 -c 'import os,hmac,hashlib,struct; k=bytes.fromhex(os.environ["SECRET"]); c=int(os.environ["STEP"]); d=hmac.new(k,struct.pack(">Q",c),hashlib.sha1).digest(); i=d[-1]&15; print(f"{(struct.unpack(">I",d[i:i+4])[0]&0x7fffffff)%1000000:06d}")')"
-CONFIRMED="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" -H 'Content-Type: application/json' --data "{\\"code\\":\\"$OTP\\"}" "$BASE/api/v1/security/mfa/confirm")"
+OTP="$(python3 -c 'import os,hmac,hashlib,struct; k=bytes.fromhex(os.environ["SECRET"]); c=int(os.environ["STEP"]); d=hmac.new(k,struct.pack(">Q",c),hashlib.sha1).digest(); i=d[-1]&15; print("%06d" % ((struct.unpack(">I",d[i:i+4])[0]&0x7fffffff)%1000000))')"
+CONFIRMED="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" -H 'Content-Type: application/json' --data "$(printf '{"code":"%s"}' "$OTP")" "$BASE/api/v1/security/mfa/confirm")"
 test "$CONFIRMED" = 204 || { echo "MFA confirmation failed: $CONFIRMED"; exit 1; }
 REPLAY="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" "$BASE/api/v1/security/tokens" -H "X-TOTP-Code: $OTP")"
 test "$REPLAY" = 401 || { echo "MFA replay not blocked: $REPLAY"; exit 1; }
