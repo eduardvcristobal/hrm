@@ -55,13 +55,8 @@ public class EmploymentHistoryController {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Employment change predates hire");
             String previous=hires.get(0).status();
             String next=input.status();
-            if ((previous.equals("TERMINATED") || previous.equals("RETIRED")) && !next.equals("ACTIVE"))
-                throw new ResponseStatusException(HttpStatus.CONFLICT,"Separated employee requires rehire");
-            if (previous.equals("RETIRED") && next.equals("ACTIVE"))
-                throw new ResponseStatusException(HttpStatus.CONFLICT,"Retired employee requires separate rehire case");
-            if (previous.equals("ACTIVE") && next.equals("ACTIVE")
-                && hires.get(0).type().equals(input.type()))
-                throw new ResponseStatusException(HttpStatus.CONFLICT,"No lifecycle transition");
+            if(!EmploymentTransitionRules.allowed(previous,next,hires.get(0).type(),input.type()))
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"Transition requires approved lifecycle workflow or changes no state");
             LocalDate latest=jdbc.queryForObject("""
                 SELECT max(effective_date) FROM personnel_employment_history
                 WHERE tenant_id=? AND employee_id=?
