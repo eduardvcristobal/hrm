@@ -72,3 +72,8 @@ TOMBSTONE_DENIED="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w 
 { test "$TOMBSTONE_DENIED" = 409 || test "$TOMBSTONE_DENIED" = 403; } || { echo "Held document could be deleted: $TOMBSTONE_DENIED"; exit 1; }
 RETENTION_DENIED="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data '{"retainUntil":"2027-12-31"}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/retention")"
 { test "$RETENTION_DENIED" = 409 || test "$RETENTION_DENIED" = 403; } || { echo "Held document retention changed: $RETENTION_DENIED"; exit 1; }
+
+HELD_PURGE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/purge")"
+{ test "$HELD_PURGE" = 403 || test "$HELD_PURGE" = 409; } || { echo "Held document purge accepted: $HELD_PURGE"; exit 1; }
+ACTIVE_PURGE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$VERSION_ID/purge")"
+{ test "$ACTIVE_PURGE" = 403 || test "$ACTIVE_PURGE" = 409; } || { echo "Active replacement purge accepted: $ACTIVE_PURGE"; exit 1; }
