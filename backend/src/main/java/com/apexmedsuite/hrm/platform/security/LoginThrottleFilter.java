@@ -16,7 +16,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 /** Shared PostgreSQL login-attempt counter. Client-supplied forwarded headers are intentionally ignored. */
 public class LoginThrottleFilter extends OncePerRequestFilter {
     private final JdbcTemplate jdbc;
-    public LoginThrottleFilter(JdbcTemplate jdbc) { this.jdbc=jdbc; }
+    private final DatabaseUserDetailsService users;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwords;
+    public LoginThrottleFilter(JdbcTemplate jdbc,DatabaseUserDetailsService users,
+         org.springframework.security.crypto.password.PasswordEncoder passwords) {
+        this.jdbc=jdbc;this.users=users;this.passwords=passwords;
+    }
     @Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain)
             throws ServletException,IOException {
         String key=key(request);
@@ -32,6 +37,13 @@ public class LoginThrottleFilter extends OncePerRequestFilter {
             response.getWriter().write("{\"title\":\"Too Many Requests\",\"status\":429}");
             return;
         }
+        boolean valid = validCredentials(request);
+        if(valid) {
+            jdbc.update("DELETE FROM auth_login_attempt WHERE key_sha256=?",key);
+            chain.doFilter(request,response);
+            return;
+        }
+        // Count only invalid credentials, not valid credentials rejected by MFA/authorization.
         // Count attempted Basic authentication before invoking Spring Security:
         // failed authentication may exit the chain by an exception path.
         jdbc.update("""
@@ -45,8 +57,19 @@ public class LoginThrottleFilter extends OncePerRequestFilter {
                 updated_at=now()
             """,key);
         chain.doFilter(request,response);
-        if(response.getStatus()<400)
-            jdbc.update("DELETE FROM auth_login_attempt WHERE key_sha256=?",key);
+
+    }
+    private boolean validCredentials(HttpServletRequest request) {
+        String auth=request.getHeader("Authorization");
+        try {
+            String decoded=new String(Base64.getDecoder().decode(auth.substring(6)),StandardCharsets.UTF_8);
+            int separator=decoded.indexOf(':');
+            if(separator<1) return false;
+            String username=decoded.substring(0,separator).toLowerCase(Locale.ROOT);
+            String password=decoded.substring(separator+1);
+            var user=users.loadUserByUsername(username);
+            return user.isEnabled() && passwords.matches(password,user.getPassword());
+        } catch(Exception ex) {return false;}
     }
     static String key(HttpServletRequest request) {
 
