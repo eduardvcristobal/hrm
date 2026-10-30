@@ -332,6 +332,7 @@ function AccountMenuIcon({ kind }: { kind: 'profile' | 'settings' | 'billing' | 
 }
 
 function Dashboard({ user, onSignOut }: { user: CurrentUser; onSignOut: () => void }) {
+  const navigate = useNavigate();
   const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
   const [secret, setSecret] = useState('');
   const [code, setCode] = useState('');
@@ -378,7 +379,7 @@ function Dashboard({ user, onSignOut }: { user: CurrentUser; onSignOut: () => vo
     { label: 'Overview', icon: '◫', available: true },
     { label: 'Users & staff', icon: '♙', available: user.roles.some(role => ['ROLE_TENANT_ADMIN', 'ROLE_HR_ADMIN'].includes(role)) },
     { label: 'Audit logs', icon: '▤', available: user.roles.some(role => ['ROLE_TENANT_ADMIN', 'ROLE_HR_ADMIN', 'ROLE_AUDITOR'].includes(role)) },
-    { label: 'Time & attendance', icon: '◷', available: false },
+    { label: 'Time & attendance', icon: '◷', available: user.roles.includes('ROLE_TENANT_ADMIN') },
     { label: 'Payroll', icon: '₱', available: false },
     { label: 'Reports', icon: '▥', available: false },
   ];
@@ -546,7 +547,7 @@ function Dashboard({ user, onSignOut }: { user: CurrentUser; onSignOut: () => vo
         <div className="workspace-picker"><span className="workspace-avatar">{(user.workspaceName?.[0] || 'W').toUpperCase()}</span><span><strong>{user.workspaceName || 'My workspace'}</strong><small>People operations</small></span><span className="picker-chevron">⌄</span></div>
         <p className="nav-caption">WORKSPACE</p>
         <nav className="workspace-nav" aria-label="Workspace navigation">
-          {navigation.map((item) => <button key={item.label} type="button" className={`workspace-nav-item${activeSection === item.label ? ' selected' : ''}`} aria-current={activeSection === item.label ? 'page' : undefined} onClick={() => { setActiveSection(item.label); setNavigationOpen(false); }}>
+          {navigation.map((item) => <button key={item.label} type="button" className={`workspace-nav-item${activeSection === item.label ? ' selected' : ''}`} aria-current={activeSection === item.label ? 'page' : undefined} onClick={() => { if(item.label === 'Time & attendance' && item.available) navigate('/timekeeping'); else setActiveSection(item.label); setNavigationOpen(false); }}>
             <span className="workspace-nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span>{!item.available && <small>SOON</small>}
           </button>)}
         </nav>
