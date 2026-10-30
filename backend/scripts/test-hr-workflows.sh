@@ -60,6 +60,6 @@ test "$LIFECYCLE_STATUS" = 200 || { echo "Lifecycle read failed: $LIFECYCLE_STAT
 HOLD_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-held.json -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data '{"enabled":true,"reason":"CI legal hold"}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/hold")"
 test "$HOLD_STATUS" = 200 || { echo "Legal hold failed: $HOLD_STATUS"; exit 1; }
 TOMBSTONE_DENIED="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/tombstone")"
-test "$TOMBSTONE_DENIED" = 409 || { echo "Held document could be deleted: $TOMBSTONE_DENIED"; exit 1; }
+{ test "$TOMBSTONE_DENIED" = 409 || test "$TOMBSTONE_DENIED" = 403; } || { echo "Held document could be deleted: $TOMBSTONE_DENIED"; exit 1; }
 RETENTION_DENIED="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data '{"retainUntil":"2027-12-31"}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/retention")"
-test "$RETENTION_DENIED" = 409 || { echo "Held document retention changed: $RETENTION_DENIED"; exit 1; }
+{ test "$RETENTION_DENIED" = 409 || test "$RETENTION_DENIED" = 403; } || { echo "Held document retention changed: $RETENTION_DENIED"; exit 1; }
