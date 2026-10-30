@@ -72,6 +72,8 @@ public class DocumentContentController {
                 SELECT c.nonce,c.ciphertext FROM personnel_document_content c
                 JOIN personnel_document_metadata m ON m.tenant_id=c.tenant_id AND m.id=c.document_id
                 WHERE c.tenant_id=? AND m.employee_id=? AND m.id=?
+                AND m.review_status='RELEASED' AND (m.expires_on IS NULL OR m.expires_on>=CURRENT_DATE)
+                AND (m.retain_until IS NULL OR m.retain_until>=CURRENT_DATE)
                 """,(rs,i)->cipher.decrypt(new DocumentContentCipher.Encrypted(
                     rs.getBytes(1),rs.getBytes(2)),user.tenantId()+":"+employeeId+":"+documentId),
                     user.tenantId(),employeeId,documentId);
