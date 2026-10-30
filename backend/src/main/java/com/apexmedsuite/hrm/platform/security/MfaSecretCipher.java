@@ -14,14 +14,17 @@ import org.springframework.stereotype.Component;
 public final class MfaSecretCipher {
     private static final SecureRandom RANDOM = new SecureRandom();
     private final SecretKeySpec key;
-    public MfaSecretCipher(@Value("${HRM_MFA_ENCRYPTION_KEY:}") String encoded) {
-        if (encoded == null || encoded.isBlank()) {
-            this.key = null;
-        } else {
-            byte[] raw = Base64.getDecoder().decode(encoded);
-            if(raw.length != 32) throw new IllegalStateException("MFA key must be 32 bytes");
-            this.key = new SecretKeySpec(raw, "AES");
-        }
+    private final SecretKeySpec previousKey;
+    public MfaSecretCipher(@Value("${HRM_MFA_ENCRYPTION_KEY:}") String encoded,
+            @Value("${HRM_MFA_PREVIOUS_ENCRYPTION_KEY:}") String previous) {
+        this.previousKey = parseKey(previous);
+        this.key=parseKey(encoded);
+    }
+    private static SecretKeySpec parseKey(String encoded) {
+        if(encoded == null || encoded.isBlank()) return null;
+        byte[] raw=Base64.getDecoder().decode(encoded);
+        if(raw.length!=32) throw new IllegalStateException("MFA encryption key must contain 32 bytes");
+        return new SecretKeySpec(raw,"AES");
     }
     public String encrypt(String secret) {
         if(key == null) throw new IllegalStateException("MFA encryption key not configured");
@@ -30,18 +33,20 @@ public final class MfaSecretCipher {
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.ENCRYPT_MODE,key,new GCMParameterSpec(128,iv));
             byte[] encrypted = cipher.doFinal(secret.getBytes(StandardCharsets.UTF_8));
-            return "v1:"+Base64.getEncoder().encodeToString(iv)+":"+Base64.getEncoder().encodeToString(encrypted);
+            return "v2:"+Base64.getEncoder().encodeToString(iv)+":"+Base64.getEncoder().encodeToString(encrypted);
         } catch(Exception ex){throw new IllegalStateException("MFA encryption failed",ex);}
     }
     public String decrypt(String payload) {
         if(key == null) throw new IllegalStateException("MFA encryption key not configured");
-        if(payload == null || !payload.startsWith("v1:")) throw new IllegalStateException("Unsupported MFA secret format");
+        if(payload == null || !(payload.startsWith("v1:") || payload.startsWith("v2:")))
+            throw new IllegalStateException("Unsupported MFA secret format");
         try {
             String[] parts=payload.split(":",3);
             byte[] iv=Base64.getDecoder().decode(parts[1]);
             if(iv.length != 12) throw new IllegalStateException("Invalid MFA IV");
             Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.DECRYPT_MODE,key,new GCMParameterSpec(128,iv));
+            SecretKeySpec candidate=payload.startsWith("v1:") && previousKey!=null ? previousKey : key;
+            cipher.init(Cipher.DECRYPT_MODE,candidate,new GCMParameterSpec(128,iv));
             return new String(cipher.doFinal(Base64.getDecoder().decode(parts[2])),StandardCharsets.UTF_8);
         } catch(Exception ex){throw new IllegalStateException("MFA secret cannot be decrypted",ex);}
     }
