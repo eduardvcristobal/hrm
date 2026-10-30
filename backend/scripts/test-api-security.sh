@@ -25,4 +25,10 @@ test "$DENIED" = 403 || { echo "Expected authenticated CSRF denial 403, got $DEN
 CREATED="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /tmp/hrm-ci-company.json -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" -H 'Content-Type: application/json' --data '{"companyCode":"CI_CSRF_OK","legalName":"CI Company"}' "$BASE/api/v1/companies")"
 test "$CREATED" = 201 || { echo "Expected authorized create 201, got $CREATED"; cat /tmp/hrm-ci-company.json; exit 1; }
 curl -fsS -u "$AUTH" -b "$COOKIE" "$BASE/api/v1/companies" | grep -q 'CI_CSRF_OK'
-echo 'HTTP authentication, CSRF denial, authenticated creation and tenant list passed'
+for i in $(seq 1 10); do
+  BAD="$(curl -sS -u 'admin-ci@example.test:incorrect-password' -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
+  test "$BAD" = 401 || { echo "Invalid login should return 401, got $BAD"; exit 1; }
+done
+LOCKED="$(curl -sS -u 'admin-ci@example.test:incorrect-password' -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
+test "$LOCKED" = 429 || { echo "Expected throttle 429, got $LOCKED"; exit 1; }
+echo 'HTTP CSRF, tenant scope, and failed-login throttle passed'
