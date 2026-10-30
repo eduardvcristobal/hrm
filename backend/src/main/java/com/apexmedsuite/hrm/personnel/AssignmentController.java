@@ -81,7 +81,7 @@ public class AssignmentController {
                 INSERT INTO personnel_assignment_history
                   (tenant_id,employee_id,company_id,branch_id,department_id,position_id,effective_date,reason,recorded_by)
                 VALUES(?,?,?,?,?,?,?,?,?)
-                RETURNING id,company_id,branch_id,department_id,effective_date,reason
+                RETURNING id,company_id,branch_id,department_id,position_id,effective_date,reason
                 """,(rs,i)->row(rs),user.tenantId(),employeeId,input.companyId(),
                 input.branchId(),input.departmentId(),input.positionId(),input.effectiveDate(),input.reason().trim(),user.id());
             jdbc.update("""
