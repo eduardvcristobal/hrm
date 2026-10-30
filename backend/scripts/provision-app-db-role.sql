@@ -34,6 +34,7 @@ GRANT SELECT,INSERT ON personnel_document_metadata TO hrm_runtime;
 GRANT SELECT,INSERT,UPDATE(status,evidence_document_id,verified_by,verified_at) ON personnel_onboarding_requirement TO hrm_runtime;
 GRANT SELECT,INSERT,UPDATE(status,reviewed_by,reviewed_at) ON personnel_separation_clearance TO hrm_runtime;
 GRANT SELECT,INSERT ON personnel_final_pay_handoff TO hrm_runtime;
+GRANT SELECT,INSERT,UPDATE(status,resolved_by,resolved_at) ON personnel_separation_asset TO hrm_runtime;
 GRANT SELECT,INSERT ON audit_event TO hrm_runtime;
 GRANT USAGE,SELECT ON SEQUENCE audit_event_id_seq TO hrm_runtime;
 REVOKE CREATE ON SCHEMA public FROM hrm_runtime;
