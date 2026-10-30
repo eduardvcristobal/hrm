@@ -27,6 +27,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/v1/security/password-reset")
 public class PasswordRecoveryController {
     private final JdbcTemplate jdbc;
+    private final ApiTokenService tokens;
     private final TransactionTemplate tx;
     private final PasswordEncoder passwords;
     private final ObjectProvider<JavaMailSender> mail;
@@ -34,8 +35,8 @@ public class PasswordRecoveryController {
     @Value("${hrm.invitation.from:}") private String from;
     @Value("${hrm.password-reset.url:}") private String resetUrl;
     public PasswordRecoveryController(JdbcTemplate jdbc,org.springframework.transaction.PlatformTransactionManager manager,
-            PasswordEncoder passwords,ObjectProvider<JavaMailSender> mail) {
-        this.jdbc=jdbc;this.tx=new TransactionTemplate(manager);this.passwords=passwords;this.mail=mail;
+            PasswordEncoder passwords,ObjectProvider<JavaMailSender> mail,ApiTokenService tokens) {
+        this.jdbc=jdbc;this.tx=new TransactionTemplate(manager);this.passwords=passwords;this.mail=mail;this.tokens=tokens;
     }
     public record Request(@NotBlank @Email @Size(max=254) String email) {}
     public record Confirm(@NotBlank String token,@NotBlank @Size(min=12,max=128) String password) {}
@@ -86,6 +87,7 @@ public class PasswordRecoveryController {
             var row=rows.get(0);
             jdbc.update("UPDATE auth_identity SET password_hash=? WHERE id=?",
                 passwords.encode(input.password()),row.identityId());
+            tokens.revokeAll(row.identityId());
             jdbc.update("UPDATE auth_password_reset SET used_at=now() WHERE id=?",row.id());
             jdbc.update("UPDATE auth_password_reset SET used_at=now() WHERE identity_id=? AND used_at IS NULL",
                 row.identityId());
