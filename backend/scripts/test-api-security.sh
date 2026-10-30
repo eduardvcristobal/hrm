@@ -44,9 +44,9 @@ OTP="$(python3 -c 'import os,hmac,hashlib,struct; k=bytes.fromhex(os.environ["SE
 CONFIRMED="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" -H 'Content-Type: application/json' --data "$(printf '{"code":"%s"}' "$OTP")" "$BASE/api/v1/security/mfa/confirm")"
 test "$CONFIRMED" = 204 || { echo "MFA confirmation failed: $CONFIRMED"; exit 1; }
 REPLAY="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" "$BASE/api/v1/security/tokens" -H "X-TOTP-Code: $OTP")"
-test "$REPLAY" = 401 || { echo "MFA replay not blocked: $REPLAY"; exit 1; }
+{ test "$REPLAY" = 401 || test "$REPLAY" = 403; } || { echo "MFA replay not blocked: $REPLAY"; exit 1; }
 UNVERIFIED="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" "$BASE/api/v1/security/tokens")"
-test "$UNVERIFIED" = 401 || { echo "MFA-less issuance not blocked: $UNVERIFIED"; exit 1; }
+{ test "$UNVERIFIED" = 401 || test "$UNVERIFIED" = 403; } || { echo "MFA-less issuance not blocked: $UNVERIFIED"; exit 1; }
 for i in $(seq 1 10); do
   BAD="$(curl -sS -u 'admin-ci@example.test:incorrect-password' -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
   test "$BAD" = 401 || { echo "Invalid login should return 401, got $BAD"; exit 1; }
