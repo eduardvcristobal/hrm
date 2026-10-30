@@ -64,6 +64,11 @@ curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees/$
 PAY_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-pay.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"effectiveDate":"2026-05-01","amount":25000.00,"payBasis":"MONTHLY","reason":"Initial compensation"}' "$BASE/api/v1/personnel/employees/$EMP_ID/compensation")"
 test "$PAY_HTTP" = 201 || { echo "Compensation creation failed: $PAY_HTTP"; cat /tmp/hrm-ci-pay.json; exit 1; }
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees/$EMP_ID/compensation" | grep -q '25000.00'
+ASSIGN_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-assignment.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$(printf '{"companyId":"%s","departmentId":"%s","effectiveDate":"2026-06-01","reason":"Operations assignment"}' "$COMPANY_ID" "$DEPT_ID")" "$BASE/api/v1/personnel/employees/$EMP_ID/assignments")"
+test "$ASSIGN_HTTP" = 201 || { echo "Assignment failed: $ASSIGN_HTTP"; cat /tmp/hrm-ci-assignment.json; exit 1; }
+curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees/$EMP_ID/assignments" | grep -q 'Operations assignment'
+CROSS_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"companyId":"00000000-0000-0000-0000-000000000001","effectiveDate":"2026-07-01","reason":"Cross company"}' "$BASE/api/v1/personnel/employees/$EMP_ID/assignments")"
+{ test "$CROSS_HTTP" = 400 || test "$CROSS_HTTP" = 403; } || { echo "Cross-company assignment not denied: $CROSS_HTTP"; exit 1; }
 REVOKED="$(curl -sS -X DELETE -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/security/tokens/current")"
 test "$REVOKED" = 204 || { echo "Token revoke returned $REVOKED"; exit 1; }
 AFTER="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
