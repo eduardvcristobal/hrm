@@ -15,10 +15,11 @@ public class MfaService {
     private static final SecureRandom RANDOM = new SecureRandom();
     private final JdbcTemplate jdbc;
     private final TotpVerifier verifier;
+    private final MfaSecretCipher cipher;
     private final TransactionTemplate transactions;
-    public MfaService(JdbcTemplate jdbc,TotpVerifier verifier,
+    public MfaService(JdbcTemplate jdbc,TotpVerifier verifier,MfaSecretCipher cipher,
             org.springframework.transaction.PlatformTransactionManager tx) {
-        this.jdbc=jdbc;this.verifier=verifier;this.transactions=new TransactionTemplate(tx);
+        this.jdbc=jdbc;this.verifier=verifier;this.cipher=cipher;this.transactions=new TransactionTemplate(tx);
     }
     public record Enrollment(String secretHex,String type) {}
     public Enrollment enroll(HrmUserPrincipal user) {
@@ -31,24 +32,24 @@ public class MfaService {
             byte[] secret=new byte[20];RANDOM.nextBytes(secret);
             String encoded=HexFormat.of().formatHex(secret);
             jdbc.update("""
-                INSERT INTO auth_totp_factor(identity_id,secret_hex,enabled,last_counter)
+                INSERT INTO auth_totp_factor(identity_id,secret_ciphertext,enabled,last_counter)
                 VALUES (?,?,false,-1)
-                ON CONFLICT (identity_id) DO UPDATE SET secret_hex=EXCLUDED.secret_hex,
+                ON CONFLICT (identity_id) DO UPDATE SET secret_ciphertext=EXCLUDED.secret_ciphertext,
                     enabled=false,last_counter=-1
                 WHERE auth_totp_factor.enabled=false
-                """,user.id(),encoded);
+                """,user.id(),cipher.encrypt(encoded));
             return new Enrollment(encoded,"totp-sha1-30s-6digits");
         });
     }
     public void confirm(HrmUserPrincipal user,String code) {
         transactions.executeWithoutResult(status -> {
             var rows=jdbc.query("""
-                SELECT secret_hex,last_counter FROM auth_totp_factor
+                SELECT secret_ciphertext,last_counter FROM auth_totp_factor
                 WHERE identity_id=? AND enabled=false FOR UPDATE
                 """,(rs,n)->new Factor(rs.getString(1),rs.getLong(2)),user.id());
             if(rows.size()!=1) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"No pending authenticator");
             Factor f=rows.get(0);
-            if(!verifier.verify(HexFormat.of().parseHex(f.secret()),code,f.counter()))
+            if(!verifier.verify(HexFormat.of().parseHex(cipher.decrypt(f.secret())),code,f.counter()))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid code");
             long counter=verifier.matchedCounter(HexFormat.of().parseHex(f.secret()),code,f.counter());
             jdbc.update("""
@@ -65,7 +66,7 @@ public class MfaService {
     public void requireVerified(HrmUserPrincipal user,String code) {
         transactions.executeWithoutResult(status -> {
             var rows=jdbc.query("""
-                SELECT secret_hex,last_counter FROM auth_totp_factor
+                SELECT secret_ciphertext,last_counter FROM auth_totp_factor
                 WHERE identity_id=? AND enabled=true FOR UPDATE
                 """,(rs,n)->new Factor(rs.getString(1),rs.getLong(2)),user.id());
             if(rows.size()!=1) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Authenticator enrollment required");
