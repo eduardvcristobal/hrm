@@ -80,6 +80,17 @@ public class HrCaseController {
                     throw new ResponseStatusException(HttpStatus.CONFLICT,"Mandatory onboarding requirements not verified");
             }
             if(decision.equals("APPROVED") && p.type().equals("SEPARATION")) {
+                Integer required=jdbc.queryForObject("""
+                    SELECT count(*) FROM personnel_separation_clearance
+                    WHERE tenant_id=? AND hr_case_id=? AND required
+                    """,Integer.class,user.tenantId(),caseId);
+                Integer incomplete=jdbc.queryForObject("""
+                    SELECT count(*) FROM personnel_separation_clearance
+                    WHERE tenant_id=? AND hr_case_id=? AND required AND status<>'CLEARED'
+                    """,Integer.class,user.tenantId(),caseId);
+                if(required==null||required==0||incomplete!=null&&incomplete>0)
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,"Required exit clearances are incomplete");
+
                 if(status.equals("TERMINATED")||status.equals("RETIRED"))
                     throw new ResponseStatusException(HttpStatus.CONFLICT,"Employee already separated");
                 LocalDate latest=jdbc.queryForObject("""
