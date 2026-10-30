@@ -87,6 +87,12 @@ echo "$PRIVATE_GET" | grep -q 'TEST-ID-123'
 BASIC_PRIVATE="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' "$BASE/api/v1/personnel/employees/$EMP_ID/private")"
 test "$BASIC_PRIVATE" = 403 || { echo "Basic-only private data disclosure: $BASIC_PRIVATE"; exit 1; }
 PGPASSWORD="$DB_PASSWORD" psql -X -At -h localhost -p 5433 -U "${DB_USERNAME:-hrm_app}" -d hrm_dev -c "SELECT government_id_ciphertext FROM personnel_private_data WHERE employee_id='$EMP_ID'" | grep -q '^v1:'
+POSITION_RETIRE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X PATCH -H 'Content-Type: application/json' --data '{"active":false}' "$BASE/api/v1/personnel/positions/$POSITION_ID/status")"
+test "$POSITION_RETIRE" = 409 || { echo "Assigned position was retired: $POSITION_RETIRE"; exit 1; }
+REPORT_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-supervisor.json -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data '{"supervisorId":null}' "$BASE/api/v1/personnel/employees/$EMP_ID/supervisor")"
+test "$REPORT_HTTP" = 200 || { echo "Supervisor update failed: $REPORT_HTTP"; cat /tmp/hrm-ci-supervisor.json; exit 1; }
+SELF_REPORT="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data "$(printf '{"supervisorId":"%s"}' "$EMP_ID")" "$BASE/api/v1/personnel/employees/$EMP_ID/supervisor")"
+{ test "$SELF_REPORT" = 400 || test "$SELF_REPORT" = 403; } || { echo "Self supervisor accepted: $SELF_REPORT"; exit 1; }
 REVOKED="$(curl -sS -X DELETE -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/security/tokens/current")"
 test "$REVOKED" = 204 || { echo "Token revoke returned $REVOKED"; exit 1; }
 AFTER="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
