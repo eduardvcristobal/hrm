@@ -37,6 +37,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/admin/invitations", "/api/v1/admin/invitations/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
                 .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
                 .requestMatchers("/api/v1/companies", "/api/v1/companies/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
+                .requestMatchers("/api/v1/personnel/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
                 .anyRequest().denyAll())
             .build();
     }
