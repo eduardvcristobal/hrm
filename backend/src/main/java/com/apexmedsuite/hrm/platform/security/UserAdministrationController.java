@@ -15,9 +15,10 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/v1/admin/users")
 public class UserAdministrationController {
     private final JdbcTemplate jdbc;
+    private final ApiTokenService tokens;
     private final TenantJdbcExecutor tenants;
-    public UserAdministrationController(JdbcTemplate jdbc, TenantJdbcExecutor tenants) {
-        this.jdbc=jdbc; this.tenants=tenants;
+    public UserAdministrationController(JdbcTemplate jdbc, TenantJdbcExecutor tenants,ApiTokenService tokens) {
+        this.jdbc=jdbc; this.tenants=tenants; this.tokens=tokens;
     }
     public record Account(UUID id, String email, boolean enabled, List<String> roles) {}
     public enum Role { TENANT_ADMIN, HR_ADMIN, PAYROLL_OFFICER, MANAGER, EMPLOYEE, AUDITOR }
@@ -58,6 +59,7 @@ public class UserAdministrationController {
             requireUser(actor,id);
             if (role == Role.TENANT_ADMIN) guardLastAdmin(actor,id);
             jdbc.update("DELETE FROM auth_identity_role WHERE identity_id=? AND role=?",id,role.name());
+            tokens.revokeAll(id);
             audit(actor,id,"USER_ROLE_REMOVED");
             return null;
         });
@@ -73,6 +75,7 @@ public class UserAdministrationController {
             if (!input.enabled()) guardLastAdmin(actor,id);
             jdbc.update("UPDATE auth_identity SET enabled=? WHERE tenant_id=? AND id=?",
                 input.enabled(),actor.tenantId(),id);
+            if(!input.enabled()) tokens.revokeAll(id);
             audit(actor,id,"USER_STATUS_CHANGED");
             return null;
         });
