@@ -22,6 +22,9 @@ GRANT SELECT,INSERT,UPDATE,DELETE ON auth_login_attempt TO hrm_runtime;
 GRANT SELECT,INSERT,UPDATE(revoked_at,last_used_at) ON auth_api_token TO hrm_runtime;
 GRANT SELECT,INSERT,UPDATE(enabled,last_counter,secret_ciphertext) ON auth_totp_factor TO hrm_runtime;
 GRANT SELECT,INSERT,UPDATE ON company,branch TO hrm_runtime;
+-- M1 personnel operations are guarded by tenant RLS and MFA-aware API roles.
+GRANT SELECT,INSERT,UPDATE ON personnel_department,personnel_employee TO hrm_runtime;
+GRANT SELECT,INSERT ON personnel_employment_history TO hrm_runtime;
 GRANT SELECT,INSERT ON audit_event TO hrm_runtime;
 GRANT USAGE,SELECT ON SEQUENCE audit_event_id_seq TO hrm_runtime;
 REVOKE CREATE ON SCHEMA public FROM hrm_runtime;
