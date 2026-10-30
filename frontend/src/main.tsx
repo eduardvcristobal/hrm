@@ -3,3 +3,33 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./styles.css";
 createRoot(document.getElementById("root")!).render(<React.StrictMode><App /></React.StrictMode>);
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import App, { InvitationAcceptance } from './App';
+
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
+
+function AppRoutes() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/platform-admin/login" element={<App platformAdminPage />} />
+        <Route path="/platform-admin" element={<App platformAdminDashboard />} />
+        <Route path="/signup" element={<App signupPage />} />
+        <Route path="/invite/accept" element={<InvitationAcceptance />} />
+        <Route path="/dashboard" element={<App dashboardPage />} />
+        <Route path="*" element={<App />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+createRoot(document.getElementById('app')!).render(
+  <StrictMode>
+    {googleClientId
+      ? <GoogleOAuthProvider clientId={googleClientId}><AppRoutes /></GoogleOAuthProvider>
+      : <AppRoutes />}
+  </StrictMode>,
+);

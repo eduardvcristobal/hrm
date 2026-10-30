@@ -72,7 +72,17 @@ public class LoginThrottleFilter extends OncePerRequestFilter {
         } catch(Exception ex) {return false;}
     }
     static String key(HttpServletRequest request) {
-
+        if("POST".equals(request.getMethod())
+                && ("/api/v1/security/platform-admin/google".equals(request.getRequestURI())
+                || "/api/v1/security/google".equals(request.getRequestURI())
+                || "/api/v1/security/signup".equals(request.getRequestURI())
+                || "/api/v1/security/signup/google".equals(request.getRequestURI()))) {
+            try {
+                var digest=MessageDigest.getInstance("SHA-256").digest(
+                    (request.getRemoteAddr()+"|"+request.getRequestURI()).getBytes(StandardCharsets.UTF_8));
+                return HexFormat.of().formatHex(digest);
+            } catch(Exception ex) {return null;}
+        }
         String header=request.getHeader("Authorization");
         if(header==null || !header.regionMatches(true,0,"Basic ",0,6) || header.length()>1024) return null;
         try {

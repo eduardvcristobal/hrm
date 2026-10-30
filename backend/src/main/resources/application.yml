@@ -29,6 +29,10 @@ spring:
         default_schema: public
   jackson:
     time-zone: UTC
+  servlet:
+    multipart:
+      max-file-size: ${BACKUP_UPLOAD_MAX_FILE_SIZE:2GB}
+      max-request-size: ${BACKUP_UPLOAD_MAX_REQUEST_SIZE:2GB}
 server:
   port: ${SERVER_PORT:8080}
 management:
@@ -44,8 +48,21 @@ management:
       show-details: never
 
 hrm:
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+    jwk-set-uri: ${GOOGLE_JWK_SET_URI:https://www.googleapis.com/oauth2/v3/certs}
+  platform-admin:
+    emails: ${PLATFORM_ADMIN_EMAILS:}
   invitation:
     from: ${INVITATION_FROM:}
     accept-url: ${INVITATION_ACCEPT_URL:}
   password-reset:
     url: ${PASSWORD_RESET_URL:}
+app:
+  backup:
+    age-recipient: ${APP_BACKUP_AGE_RECIPIENT:}
+    age-identity: ${APP_BACKUP_AGE_IDENTITY:}
+    directory: ${APP_BACKUP_DIRECTORY:./data/backups}
+    database-url: ${APP_BACKUP_DB_URL:}
+    database-username: ${APP_BACKUP_DB_USERNAME:}
+    database-password: ${APP_BACKUP_DB_PASSWORD:}
