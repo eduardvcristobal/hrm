@@ -47,6 +47,10 @@ test "$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code
 CREATED="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-company.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"companyCode":"CI_CSRF_OK","legalName":"CI Company"}' "$BASE/api/v1/companies")"
 test "$CREATED" = 201 || { echo "Expected elevated company create 201, got $CREATED"; cat /tmp/hrm-ci-company.json; exit 1; }
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/companies" | grep -q 'CI_CSRF_OK'
+COMPANY_ID="$(python3 -c 'import json; print(json.load(open("/tmp/hrm-ci-company.json"))["id"])')"
+EMP_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-employee.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$(printf '{"companyId":"%s","employeeNumber":"CI-001","firstName":"Test","lastName":"Employee","hireDate":"2026-01-01"}' "$COMPANY_ID")" "$BASE/api/v1/personnel/employees")"
+test "$EMP_HTTP" = 201 || { echo "Personnel registration failed: $EMP_HTTP"; cat /tmp/hrm-ci-employee.json; exit 1; }
+curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees?companyId=$COMPANY_ID" | grep -q 'CI-001'
 REVOKED="$(curl -sS -X DELETE -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/security/tokens/current")"
 test "$REVOKED" = 204 || { echo "Token revoke returned $REVOKED"; exit 1; }
 AFTER="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
