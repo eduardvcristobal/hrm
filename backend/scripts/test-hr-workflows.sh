@@ -55,6 +55,15 @@ test "$SELF_REVIEW" = 403 || { echo "Document uploader self-reviewed: $SELF_REVI
 ANON_DOCUMENT="$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/content")"
 { test "$ANON_DOCUMENT" = 401 || test "$ANON_DOCUMENT" = 403; } || { echo "Anonymous document access allowed: $ANON_DOCUMENT"; exit 1; }
 
+VERSION_UPLOAD="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-version.json -w '%{http_code}' -F 'file=@/tmp/hrm-document-ci.pdf;filename=revised.pdf;type=application/pdf' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/versions")"
+test "$VERSION_UPLOAD" = 201 || { echo "Replacement document failed: $VERSION_UPLOAD"; cat /tmp/hrm-version.json; exit 1; }
+VERSION_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-version.json"))["id"])')"
+VERSION_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$VERSION_ID/content")"
+{ test "$VERSION_STATUS" = 403 || test "$VERSION_STATUS" = 404; } || { echo "Unreviewed replacement was downloadable: $VERSION_STATUS"; exit 1; }
+VERSION_OLD="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -F 'file=@/tmp/hrm-document-ci.pdf;filename=invalid.pdf;type=application/pdf' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/versions")"
+{ test "$VERSION_OLD" = 403 || test "$VERSION_OLD" = 409; } || { echo "Old document version accepted replacement: $VERSION_OLD"; exit 1; }
+
+
 LIFECYCLE_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-lifecycle.json -w '%{http_code}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/lifecycle")"
 test "$LIFECYCLE_STATUS" = 200 || { echo "Lifecycle read failed: $LIFECYCLE_STATUS"; exit 1; }
 HOLD_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-held.json -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data '{"enabled":true,"reason":"CI legal hold"}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/hold")"
@@ -63,11 +72,3 @@ TOMBSTONE_DENIED="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w 
 { test "$TOMBSTONE_DENIED" = 409 || test "$TOMBSTONE_DENIED" = 403; } || { echo "Held document could be deleted: $TOMBSTONE_DENIED"; exit 1; }
 RETENTION_DENIED="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data '{"retainUntil":"2027-12-31"}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/retention")"
 { test "$RETENTION_DENIED" = 409 || test "$RETENTION_DENIED" = 403; } || { echo "Held document retention changed: $RETENTION_DENIED"; exit 1; }
-
-VERSION_UPLOAD="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-version.json -w '%{http_code}' -F 'file=@/tmp/hrm-document-ci.pdf;filename=revised.pdf;type=application/pdf' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/versions")"
-test "$VERSION_UPLOAD" = 201 || { echo "Replacement document failed: $VERSION_UPLOAD"; cat /tmp/hrm-version.json; exit 1; }
-VERSION_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-version.json"))["id"])')"
-VERSION_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$VERSION_ID/content")"
-{ test "$VERSION_STATUS" = 403 || test "$VERSION_STATUS" = 404; } || { echo "Unreviewed replacement was downloadable: $VERSION_STATUS"; exit 1; }
-VERSION_OLD="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -F 'file=@/tmp/hrm-document-ci.pdf;filename=invalid.pdf;type=application/pdf' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/versions")"
-{ test "$VERSION_OLD" = 403 || test "$VERSION_OLD" = 409; } || { echo "Old document version accepted replacement: $VERSION_OLD"; exit 1; }
