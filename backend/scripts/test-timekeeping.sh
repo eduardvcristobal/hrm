@@ -27,3 +27,12 @@ DUP_OUT="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_c
 { test "$DUP_OUT" = 403 || test "$DUP_OUT" = 409; } || { echo "Double clock-out permitted: $DUP_OUT"; exit 1; }
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/timekeeping/employees/$EMP_ID/attendance" | grep -q "$SESSION_ID"
 echo "M2.2 attendance clock-in/out regression passed"
+
+
+SUMMARY_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-attendance-summary.json -w '%{http_code}' "$BASE/api/v1/timekeeping/employees/$EMP_ID/summaries?from=2026-10-01&to=2026-10-31&timezone=Asia%2FManila")"
+test "$SUMMARY_STATUS" = 200 || { echo "Attendance summary failed: $SUMMARY_STATUS"; cat /tmp/hrm-attendance-summary.json; exit 1; }
+python3 -c 'import json; data=json.load(open("/tmp/hrm-attendance-summary.json"));assert isinstance(data,list)'
+BAD_SUMMARY="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/timekeeping/employees/$EMP_ID/summaries?from=2026-01-01&to=2026-12-31")"
+{ test "$BAD_SUMMARY" = 400 || test "$BAD_SUMMARY" = 403; } || { echo "Overlong report accepted: $BAD_SUMMARY"; exit 1; }
+BAD_ZONE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/timekeeping/employees/$EMP_ID/summaries?from=2026-10-01&to=2026-10-31&timezone=BadZone")"
+{ test "$BAD_ZONE" = 400 || test "$BAD_ZONE" = 403; } || { echo "Invalid timezone accepted: $BAD_ZONE"; exit 1; }
