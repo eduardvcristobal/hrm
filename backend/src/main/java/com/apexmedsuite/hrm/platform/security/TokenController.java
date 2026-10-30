@@ -8,10 +8,13 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/security/tokens")
 public class TokenController {
     private final ApiTokenService tokens;
-    public TokenController(ApiTokenService tokens){this.tokens=tokens;}
+    private final MfaService mfa;
+    public TokenController(ApiTokenService tokens,MfaService mfa){this.tokens=tokens;this.mfa=mfa;}
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiTokenService.Token issue(@AuthenticationPrincipal HrmUserPrincipal user){
+    public ApiTokenService.Token issue(@AuthenticationPrincipal HrmUserPrincipal user,
+            @RequestHeader(value="X-TOTP-Code",required=false) String code){
+        if(mfa.isEnabled(user.id())) mfa.requireVerified(user,code);
         return tokens.issue(user);
     }
     @DeleteMapping("/current")
