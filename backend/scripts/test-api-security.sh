@@ -76,6 +76,13 @@ ANON_SALARY="$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/api/v1/personnel/e
 PROFILE_PATCH="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-profile.json -w '%{http_code}' -X PATCH -H 'Content-Type: application/json' --data '{"middleName":"Initial","preferredName":"Team Member","suffix":null}' "$BASE/api/v1/personnel/employees/$EMP_ID/profile")"
 test "$PROFILE_PATCH" = 200 || { echo "Profile update failed: $PROFILE_PATCH"; cat /tmp/hrm-ci-profile.json; exit 1; }
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees/$EMP_ID/profile" | grep -q 'Team Member'
+PRIVATE_WRITE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data '{"governmentId":"TEST-ID-123","contactEmail":"test@example.invalid","mobile":"09170000000","bankAccount":"TEST-BANK-456"}' "$BASE/api/v1/personnel/employees/$EMP_ID/private")"
+test "$PRIVATE_WRITE" = 200 || { echo "Private field update failed: $PRIVATE_WRITE"; exit 1; }
+PRIVATE_GET="$(curl -sS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees/$EMP_ID/private")"
+echo "$PRIVATE_GET" | grep -q 'TEST-ID-123'
+BASIC_PRIVATE="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' "$BASE/api/v1/personnel/employees/$EMP_ID/private")"
+test "$BASIC_PRIVATE" = 403 || { echo "Basic-only private data disclosure: $BASIC_PRIVATE"; exit 1; }
+PGPASSWORD="$DB_PASSWORD" psql -X -At -h localhost -p 5433 -U "${DB_USERNAME:-hrm_app}" -d hrm_dev -c "SELECT government_id_ciphertext FROM personnel_private_data WHERE employee_id='$EMP_ID'" | grep -q '^v1:'
 REVOKED="$(curl -sS -X DELETE -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/security/tokens/current")"
 test "$REVOKED" = 204 || { echo "Token revoke returned $REVOKED"; exit 1; }
 AFTER="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
