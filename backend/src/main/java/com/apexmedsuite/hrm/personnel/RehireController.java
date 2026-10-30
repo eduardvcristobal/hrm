@@ -49,8 +49,7 @@ public class RehireController {
             LocalDate latest=jdbc.queryForObject("""
                 SELECT max(effective_date) FROM personnel_employment_history WHERE tenant_id=? AND employee_id=?
                 """,LocalDate.class,user.tenantId(),employeeId);
-            if(latest!=null&&!input.effectiveDate().isAfter(latest))
-                throw new ResponseStatusException(HttpStatus.CONFLICT,"Rehire effective date must follow separation");
+            ensureEligible(user.tenantId(),employeeId,statuses.get(0),latest,input.effectiveDate());
             RehireRequest result=jdbc.queryForObject("""
                 INSERT INTO personnel_rehire_request
                   (tenant_id,employee_id,effective_date,employment_type,reason,requested_by)
@@ -88,8 +87,7 @@ public class RehireController {
             LocalDate latest=jdbc.queryForObject("""
                 SELECT max(effective_date) FROM personnel_employment_history WHERE tenant_id=? AND employee_id=?
                 """,LocalDate.class,user.tenantId(),employeeId);
-            if(latest!=null&&!request.effectiveDate().isAfter(latest))
-                throw new ResponseStatusException(HttpStatus.CONFLICT,"Stale rehire effective date");
+            ensureEligible(user.tenantId(),employeeId,statuses.get(0),latest,request.effectiveDate());
             jdbc.update("""
                 UPDATE personnel_employee SET employment_status='ACTIVE',employment_type=?,updated_at=now()
                 WHERE tenant_id=? AND id=?
@@ -165,6 +163,16 @@ public class RehireController {
             return result;
         });
     }
+    private void ensureEligible(UUID tenantId,UUID employeeId,String employmentStatus,
+                                LocalDate separation,LocalDate requestedDate) {
+        List<Policy> policies=jdbc.query("""
+            SELECT enabled,minimum_wait_days FROM personnel_rehire_policy WHERE tenant_id=?
+            """,(rs,i)->new Policy(rs.getBoolean(1),rs.getInt(2)),tenantId);
+        Policy policy=policies.isEmpty()?new Policy(true,0):policies.get(0);
+        if(!RehireEligibility.eligible(employmentStatus,separation,requestedDate,policy.enabled(),policy.waitDays()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Rehire ineligible under tenant policy or separation chronology");
+    }
+    private record Policy(boolean enabled,int waitDays) {}
     private record Pending(LocalDate effectiveDate,String employmentType,String reason,UUID requestedBy) {}
     private static RehireRequest row(java.sql.ResultSet rs) throws java.sql.SQLException {
         return new RehireRequest(rs.getObject("id",UUID.class),
