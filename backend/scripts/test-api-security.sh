@@ -118,7 +118,7 @@ REPLACEMENT_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-rehi
 test "$REPLACEMENT_HTTP" = 201 || { echo "Replacement rehire failed: $REPLACEMENT_HTTP"; exit 1; }
 REHIRE_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-rehire-replacement.json"))["id"])')"
 export EMP_ID REHIRE_ID
-bash scripts/test-rehire-dual-control.sh
+source scripts/test-rehire-dual-control.sh
 source scripts/test-hr-workflows.sh
 source scripts/test-timekeeping.sh
 REVOKED="$(curl -sS -X DELETE -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/security/tokens/current")"
