@@ -4,7 +4,8 @@
 BEGIN;
 CREATE ROLE hrm_rls_regression NOLOGIN NOSUPERUSER NOBYPASSRLS;
 GRANT USAGE ON SCHEMA public TO hrm_rls_regression;
-GRANT SELECT ON company,branch,audit_event TO hrm_rls_regression;
+GRANT SELECT, INSERT, UPDATE ON company TO hrm_rls_regression;
+GRANT SELECT ON branch,audit_event TO hrm_rls_regression;
 CREATE TEMP TABLE rls_expect (tenant_a uuid, tenant_b uuid);
 INSERT INTO rls_expect VALUES (gen_random_uuid(),gen_random_uuid());
 INSERT INTO tenant(id,slug,display_name)
@@ -32,6 +33,14 @@ BEGIN
   RAISE EXCEPTION 'Tenant B leaked into tenant A';
  END IF;
 END $$;
+-- Cross-tenant updates must not touch B, and inserts for B must be rejected.
+DO $
+DECLARE changed integer;
+BEGIN
+ UPDATE company SET legal_name='SHOULD_NOT_CHANGE' WHERE company_code='RLS_B';
+ GET DIAGNOSTICS changed = ROW_COUNT;
+ IF changed <> 0 THEN RAISE EXCEPTION 'Cross-tenant update succeeded'; END IF;
+END $;
 -- Missing setting must fail closed.
 SELECT set_config('app.tenant_id','',true);
 DO $$
