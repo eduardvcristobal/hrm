@@ -16,8 +16,13 @@ public class TokenController {
     public ApiTokenService.Token issue(@AuthenticationPrincipal HrmUserPrincipal user,
             @RequestHeader(value="X-TOTP-Code",required=false) String code){
         boolean mfaEnabled=mfa.isEnabled(user.id());
-        // MFA is a login challenge only after the user enrolls an authenticator.
-        // Otherwise authorization is determined by the account's assigned roles.
+        // Privileged roles may not opt out of MFA by leaving enrollment incomplete.
+        boolean privileged=user.getAuthorities().stream().anyMatch(authority ->
+            java.util.Set.of("ROLE_TENANT_ADMIN","ROLE_HR_ADMIN","ROLE_PAYROLL_OFFICER",
+                "ROLE_MANAGER","ROLE_AUDITOR").contains(authority.getAuthority()));
+        if(privileged&&!mfaEnabled)
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN,
+                "MFA enrollment required for privileged account");
         if(mfaEnabled) {
             if(code==null || code.isBlank())
                 throw new org.springframework.web.server.ResponseStatusException(HttpStatus.PRECONDITION_REQUIRED,"Authenticator code required");
