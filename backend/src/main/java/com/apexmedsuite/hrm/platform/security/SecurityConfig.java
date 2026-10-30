@@ -18,7 +18,7 @@ public class SecurityConfig {
         return http
             .addFilterBefore(new LoginThrottleFilter(jdbc), BasicAuthenticationFilter.class)
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
-            .httpBasic(basic -> {})
+            .httpBasic(basic -> basic.authenticationEntryPoint(new LoginFailureEntryPoint(jdbc)))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/me").authenticated()
