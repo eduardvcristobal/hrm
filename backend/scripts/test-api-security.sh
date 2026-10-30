@@ -61,6 +61,9 @@ EMP_ID="$(python3 -c 'import json; print(json.load(open("/tmp/hrm-ci-employee.js
 CHANGE_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-employment.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"effectiveDate":"2026-04-01","status":"ON_LEAVE","type":"REGULAR","jobTitle":"Analyst","reason":"Approved leave"}' "$BASE/api/v1/personnel/employees/$EMP_ID/employment")"
 test "$CHANGE_HTTP" = 201 || { echo "Employment change failed: $CHANGE_HTTP"; cat /tmp/hrm-ci-employment.json; exit 1; }
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees/$EMP_ID/employment" | grep -q 'ON_LEAVE'
+PAY_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-pay.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"effectiveDate":"2026-05-01","amount":25000.00,"payBasis":"MONTHLY","reason":"Initial compensation"}' "$BASE/api/v1/personnel/employees/$EMP_ID/compensation")"
+test "$PAY_HTTP" = 201 || { echo "Compensation creation failed: $PAY_HTTP"; cat /tmp/hrm-ci-pay.json; exit 1; }
+curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees/$EMP_ID/compensation" | grep -q '25000.00'
 REVOKED="$(curl -sS -X DELETE -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/security/tokens/current")"
 test "$REVOKED" = 204 || { echo "Token revoke returned $REVOKED"; exit 1; }
 AFTER="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
