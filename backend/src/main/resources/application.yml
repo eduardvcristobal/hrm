@@ -44,3 +44,5 @@ hrm:
   invitation:
     from: ${INVITATION_FROM:}
     accept-url: ${INVITATION_ACCEPT_URL:}
+  password-reset:
+    url: ${PASSWORD_RESET_URL:}
