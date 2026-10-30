@@ -2,6 +2,8 @@ package com.apexmedsuite.hrm.platform.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -12,8 +14,9 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 public class SecurityConfig {
     @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(12); }
-    @Bean SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    @Bean SecurityFilterChain securityFilterChain(HttpSecurity http, JdbcTemplate jdbc) throws Exception {
         return http
+            .addFilterBefore(new LoginThrottleFilter(jdbc), BasicAuthenticationFilter.class)
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
             .httpBasic(basic -> {})
             .authorizeHttpRequests(auth -> auth
