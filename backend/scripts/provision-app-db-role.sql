@@ -19,6 +19,7 @@ GRANT SELECT,INSERT ON auth_identity TO hrm_runtime;
 GRANT SELECT,INSERT,UPDATE(used_at) ON auth_invitation TO hrm_runtime;
 GRANT SELECT,INSERT,UPDATE(used_at) ON auth_password_reset TO hrm_runtime;
 GRANT SELECT,INSERT,UPDATE,DELETE ON auth_login_attempt TO hrm_runtime;
+GRANT SELECT,INSERT,UPDATE(revoked_at,last_used_at) ON auth_api_token TO hrm_runtime;
 GRANT SELECT,INSERT,UPDATE ON company,branch TO hrm_runtime;
 GRANT SELECT,INSERT ON audit_event TO hrm_runtime;
 GRANT USAGE,SELECT ON SEQUENCE audit_event_id_seq TO hrm_runtime;
