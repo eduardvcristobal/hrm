@@ -28,6 +28,8 @@ jobs:
       DB_USERNAME: hrm_app
       DB_PASSWORD: ci_only_password
       HRM_MFA_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      HRM_PERSONNEL_PII_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      HRM_DOCUMENT_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -61,3 +63,58 @@ jobs:
           PGPASSWORD="$DB_PASSWORD" psql -X -v ON_ERROR_STOP=1 -h localhost -p 5433 -U "$DB_USERNAME" -d hrm_dev -f scripts/test-tenant-rls.sql
           bash scripts/test-api-security.sh
           bash scripts/test-runtime-role.sh
+          PGPASSWORD="$DB_PASSWORD" psql -X -v ON_ERROR_STOP=1 -h localhost -p 5433 -U "$DB_USERNAME" -d hrm_dev -f scripts/test-personnel-rls.sql
+
+  personnel-frontend:
+    name: Personnel frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck and production build
+        run: npm run build
+      - name: Install Chromium browser
+        run: npx playwright install --with-deps chromium
+      - name: Personnel browser smoke tests
+        run: npm run test:e2e
+
+  clamav-integration:
+    name: Real ClamAV malware scan certification
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      HRM_CLAMAV_HOST: 127.0.0.1
+      HRM_CLAMAV_PORT: '3310'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Start real ClamAV daemon with signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name hrm-clamd -p 127.0.0.1:3310:3310 clamav/clamav:stable
+          READY=0
+          for i in {1..120}; do
+            if bash -c 'exec 3<>/dev/tcp/127.0.0.1/3310; printf "zPING\\0" >&3; IFS= read -r -d "" reply <&3; [[ "$reply" == PONG ]]' 2>/dev/null; then READY=1; break; fi
+            sleep 3
+          done
+          if [ "$READY" != 1 ]; then docker logs hrm-clamd; exit 1; fi
+      - name: Verify real clean, EICAR infected and scanner absent
+        run: mvn -B -Dtest=DocumentMalwareScannerIntegrationTest test
+      - name: Stop daemon
+        if: always()
+        run: docker rm -f hrm-clamd || true
