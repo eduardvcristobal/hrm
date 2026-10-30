@@ -30,3 +30,11 @@ test "$REVIEW_CODE" = 200 || { echo "Clearance review failed: $REVIEW_CODE"; cat
 
 FINAL_PAY_PENDING="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/personnel/employees/$EMP_ID/hr-cases/$SEPARATION_ID/final-pay")"
 { test "$FINAL_PAY_PENDING" = 403 || test "$FINAL_PAY_PENDING" = 409; } || { echo "Unapproved final-pay handoff accepted: $FINAL_PAY_PENDING"; exit 1; }
+
+
+ASSET_CREATE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-asset.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"assetTag":"CI-LAPTOP-001","description":"Test laptop return"}' "$BASE/api/v1/personnel/employees/$EMP_ID/hr-cases/$SEPARATION_ID/assets")"
+test "$ASSET_CREATE" = 201 || { echo "Asset registration failed: $ASSET_CREATE"; cat /tmp/hrm-ci-asset.json; exit 1; }
+ASSET_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-ci-asset.json"))["id"])')"
+ASSET_RETURN="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-asset-return.json -w '%{http_code}' -X PATCH -H 'Content-Type: application/json' --data '{"status":"RETURNED"}' "$BASE/api/v1/personnel/employees/$EMP_ID/hr-cases/$SEPARATION_ID/assets/$ASSET_ID")"
+test "$ASSET_RETURN" = 200 || { echo "Asset return failed: $ASSET_RETURN"; cat /tmp/hrm-ci-asset-return.json; exit 1; }
+curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees/$EMP_ID/hr-cases/$SEPARATION_ID/assets" | grep -q 'RETURNED'
