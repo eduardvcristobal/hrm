@@ -14,6 +14,10 @@ import java.util.HexFormat;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.SimpleMailMessage;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,14 +30,18 @@ public class InvitationController {
     private final JdbcTemplate jdbc;
     private final TenantJdbcExecutor tenants;
     private final PasswordEncoder passwords;
+    private final ObjectProvider<JavaMailSender> mail;
+    @Value("${hrm.invitation.accept-url:}") private String acceptUrl;
+    @Value("${hrm.invitation.from:}") private String from;
     private final org.springframework.transaction.support.TransactionTemplate tx;
-    public InvitationController(JdbcTemplate jdbc,TenantJdbcExecutor tenants,PasswordEncoder passwords,org.springframework.transaction.PlatformTransactionManager manager) {
+    public InvitationController(JdbcTemplate jdbc,TenantJdbcExecutor tenants,PasswordEncoder passwords,org.springframework.transaction.PlatformTransactionManager manager,ObjectProvider<JavaMailSender> mail) {
         this.jdbc=jdbc;this.tenants=tenants;this.passwords=passwords;
         this.tx=new org.springframework.transaction.support.TransactionTemplate(manager);
+        this.mail=mail;
     }
     public record Invite(@NotBlank @Email @Size(max=254) String email,
                          @NotNull UserAdministrationController.Role role) {}
-    public record InviteResult(String token, Instant expiresAt) {}
+    public record InviteResult(Instant expiresAt) {}
     public record Accept(@NotBlank String token,
                          @NotBlank @Size(min=12,max=128) String password) {}
     private static String digest(String value) {
@@ -47,6 +55,9 @@ public class InvitationController {
     public InviteResult create(@AuthenticationPrincipal HrmUserPrincipal actor,@Valid @RequestBody Invite input) {
         if(input.role()==UserAdministrationController.Role.TENANT_ADMIN)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Tenant admin invitations require separate owner authorization");
+        JavaMailSender sender=mail.getIfAvailable();
+        if(sender==null || acceptUrl.isBlank() || from.isBlank())
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"Invitation delivery is not configured");
         byte[] bytes=new byte[32]; RANDOM.nextBytes(bytes);
         String token=HexFormat.of().formatHex(bytes), hash=digest(token);
         Instant expiry=Instant.now().plusSeconds(48*3600);
@@ -64,7 +75,17 @@ public class InvitationController {
               INSERT INTO audit_event(tenant_id,actor_id,action,entity_type)
               VALUES (?,?,'INVITATION_CREATED','auth_invitation')
               """,actor.tenantId(),actor.id());
-            return new InviteResult(token,expiry);
+            SimpleMailMessage message=new SimpleMailMessage();
+            message.setFrom(from);
+            message.setTo(email);
+            message.setSubject("Your HRM invitation");
+            message.setText("You've been invited to the HRM portal. Accept before expiration: "
+                + acceptUrl + (acceptUrl.contains("?") ? "&" : "?") + "token=" + token);
+            try { sender.send(message); }
+            catch (org.springframework.mail.MailException e) {
+                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"Invitation delivery failed");
+            }
+            return new InviteResult(expiry);
         });
     }
     @PostMapping("/api/v1/invitations/accept")
