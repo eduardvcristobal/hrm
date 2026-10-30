@@ -27,7 +27,9 @@ public class LoginThrottleFilter extends OncePerRequestFilter {
             """,Integer.class,key);
         if(attempts!=null && attempts>=10) {
             response.setHeader("Retry-After","600");
-            response.sendError(429,"Too many unsuccessful authentication attempts");
+            response.setStatus(429);
+            response.setContentType("application/problem+json");
+            response.getWriter().write("{\\"title\\":\\"Too Many Requests\\",\\"status\\":429}");
             return;
         }
         // Count attempted Basic authentication before invoking Spring Security:
