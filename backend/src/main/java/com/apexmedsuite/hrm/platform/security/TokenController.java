@@ -14,8 +14,12 @@ public class TokenController {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiTokenService.Token issue(@AuthenticationPrincipal HrmUserPrincipal user,
             @RequestHeader(value="X-TOTP-Code",required=false) String code){
-        if(mfa.isEnabled(user.id())) mfa.requireVerified(user,code);
-        return tokens.issue(user);
+        boolean privileged=user.getAuthorities().stream().anyMatch(a ->
+            a.getAuthority().equals("ROLE_TENANT_ADMIN") ||
+            a.getAuthority().equals("ROLE_HR_ADMIN") ||
+            a.getAuthority().equals("ROLE_PAYROLL_OFFICER"));
+        if(privileged || mfa.isEnabled(user.id())) mfa.requireVerified(user,code);
+        return tokens.issue(user,privileged || mfa.isEnabled(user.id()));
     }
     @DeleteMapping("/current")
     @ResponseStatus(HttpStatus.NO_CONTENT)
