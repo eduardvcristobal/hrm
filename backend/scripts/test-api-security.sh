@@ -22,6 +22,10 @@ TOKEN="$(python3 -c 'import json; print(json.load(open("/tmp/hrm-ci-token.json")
 test -n "$TOKEN"
 DENIED="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"companyCode":"CI_CSRF_DENY","legalName":"Denied"}' "$BASE/api/v1/companies")"
 test "$DENIED" = 403 || { echo "Expected authenticated CSRF denial 403, got $DENIED"; exit 1; }
+BASIC_ADMIN="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" -H 'Content-Type: application/json' --data '{"companyCode":"BASIC_DENY","legalName":"Denied"}' "$BASE/api/v1/companies")"
+test "$BASIC_ADMIN" = 403 || { echo "Basic authentication bypassed MFA admin guard: $BASIC_ADMIN"; exit 1; }
+PRE_ENROLL="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" "$BASE/api/v1/security/tokens")"
+{ test "$PRE_ENROLL" = 401 || test "$PRE_ENROLL" = 403; } || { echo "Privileged account issued token before MFA enrollment: $PRE_ENROLL"; exit 1; }
 # MFA enrollment and replay checks for the privileged CI account.
 ENROLL="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /tmp/hrm-mfa.json -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" "$BASE/api/v1/security/mfa/enroll")"
 test "$ENROLL" = 201 || { echo "MFA enrollment failed: $ENROLL"; cat /tmp/hrm-mfa.json; exit 1; }
