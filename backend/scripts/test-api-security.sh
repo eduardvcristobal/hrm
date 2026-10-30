@@ -109,6 +109,7 @@ GENERIC_REHIRE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%
 { test "$GENERIC_REHIRE" = 403 || test "$GENERIC_REHIRE" = 409; } || { echo "Generic rehire bypass allowed: $GENERIC_REHIRE"; exit 1; }
 export EMP_ID REHIRE_ID
 bash scripts/test-rehire-dual-control.sh
+source scripts/test-hr-workflows.sh
 REVOKED="$(curl -sS -X DELETE -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/security/tokens/current")"
 test "$REVOKED" = 204 || { echo "Token revoke returned $REVOKED"; exit 1; }
 AFTER="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
