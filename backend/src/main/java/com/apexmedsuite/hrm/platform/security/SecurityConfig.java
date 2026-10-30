@@ -40,6 +40,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/personnel/employees/*/hr-cases", "/api/v1/personnel/employees/*/hr-cases/**",
                     "/api/v1/personnel/employees/*/documents", "/api/v1/personnel/employees/*/documents/**")
                     .hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
+                .requestMatchers("/api/v1/personnel/rehire-policy")
+                    .hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
                 .requestMatchers("/api/v1/personnel/employees/*/rehire-requests", "/api/v1/personnel/employees/*/rehire-requests/**")
                     .hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
                 .requestMatchers("/api/v1/personnel/employees/*/private")
