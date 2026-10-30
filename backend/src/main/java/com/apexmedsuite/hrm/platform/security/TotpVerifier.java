@@ -10,15 +10,16 @@ import org.springframework.stereotype.Component;
 @Component
 public class TotpVerifier {
     public boolean verify(byte[] secret,String submitted,long previousCounter) {
-        if(secret==null || submitted==null || !submitted.matches("[0-9]{6}")) return false;
-        long counter=Instant.now().getEpochSecond()/30;
-        int expected;
-        for(long c=counter-1;c<=counter+1;c++) {
+        return matchedCounter(secret,submitted,previousCounter)>=0;
+    }
+    public long matchedCounter(byte[] secret,String submitted,long previousCounter) {
+        if(secret==null || submitted==null || !submitted.matches("[0-9]{6}")) return -1;
+        long current=Instant.now().getEpochSecond()/30;
+        for(long c=current-1;c<=current+1;c++) {
             if(c<=previousCounter) continue;
-            expected=code(secret,c);
-            if(String.format(java.util.Locale.ROOT,"%06d",expected).equals(submitted)) return true;
+            if(String.format(java.util.Locale.ROOT,"%06d",code(secret,c)).equals(submitted)) return c;
         }
-        return false;
+        return -1;
     }
     public int code(byte[] secret,long step) {
         try {
