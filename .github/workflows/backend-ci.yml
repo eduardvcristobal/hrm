@@ -27,6 +27,7 @@ jobs:
       DB_URL: jdbc:postgresql://localhost:5433/hrm_dev
       DB_USERNAME: hrm_app
       DB_PASSWORD: ci_only_password
+      HRM_MFA_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -37,3 +38,26 @@ jobs:
           cache-dependency-path: backend/pom.xml
       - name: Compile and run tests
         run: mvn -B verify
+      - name: Boot application and verify two-tenant RLS
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B spring-boot:run > /tmp/hrm-boot.log 2>&1 &
+          APP_PID=$!
+          trap 'kill "$APP_PID" 2>/dev/null || true; tail -100 /tmp/hrm-boot.log' EXIT
+          READY=0
+          for i in {1..90}; do
+            if curl -fsS http://localhost:8080/actuator/health >/dev/null; then READY=1; break; fi
+            if ! kill -0 "$APP_PID" 2>/dev/null; then break; fi
+            sleep 2
+          done
+          if [ "$READY" -ne 1 ]; then echo "Application startup failed"; exit 1; fi
+          CSRF_CODE=$(curl -sS -o /tmp/hrm-csrf.json -w '%{http_code}' http://localhost:8080/api/v1/security/csrf)
+          test "$CSRF_CODE" = "200" || { echo "CSRF endpoint failed: $CSRF_CODE"; exit 1; }
+          DENIED_CODE=$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"token":"bogus","password":"testPassword123!"}' http://localhost:8080/api/v1/invitations/accept)
+          test "$DENIED_CODE" = "401" || test "$DENIED_CODE" = "403" || { echo "Anonymous mutation not rejected: $DENIED_CODE"; exit 1; }
+          AUTH_CODE=$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:8080/api/v1/admin/users)
+          test "$AUTH_CODE" = "401" || { echo "Unauthenticated admin request returned: $AUTH_CODE"; exit 1; }
+          PGPASSWORD="$DB_PASSWORD" psql -X -v ON_ERROR_STOP=1 -h localhost -p 5433 -U "$DB_USERNAME" -d hrm_dev -f scripts/test-tenant-rls.sql
+          bash scripts/test-api-security.sh
+          bash scripts/test-runtime-role.sh
