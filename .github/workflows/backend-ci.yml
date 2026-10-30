@@ -27,6 +27,7 @@ jobs:
       DB_URL: jdbc:postgresql://localhost:5433/hrm_dev
       DB_USERNAME: hrm_app
       DB_PASSWORD: ci_only_password
+      HRM_MFA_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
