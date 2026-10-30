@@ -19,8 +19,10 @@ SELECT set_config('app.tenant_id',tenant_b::text,true) FROM rls_expect;
 INSERT INTO company(tenant_id,company_code,legal_name)
 SELECT tenant_b,'RLS_B','Isolation B' FROM rls_expect;
 -- A restricted role must see exactly its tenant's company.
+-- Capture the tenant ID before switching roles: the test role cannot read the temp setup table.
+SELECT tenant_a::text AS tenant_a FROM rls_expect \gset
 SET LOCAL ROLE hrm_rls_regression;
-SELECT set_config('app.tenant_id',tenant_a::text,true) FROM rls_expect;
+SELECT set_config('app.tenant_id', :'tenant_a', true);
 DO $$
 BEGIN
  IF (SELECT count(*) FROM company WHERE company_code IN ('RLS_A','RLS_B')) <> 1 THEN
