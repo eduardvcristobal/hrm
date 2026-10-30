@@ -57,6 +57,10 @@ DEPT_BLOCK="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{htt
 EMP_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-employee.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$(printf '{"companyId":"%s","employeeNumber":"CI-001","firstName":"Test","lastName":"Employee","hireDate":"2026-01-01"}' "$COMPANY_ID")" "$BASE/api/v1/personnel/employees")"
 test "$EMP_HTTP" = 201 || { echo "Personnel registration failed: $EMP_HTTP"; cat /tmp/hrm-ci-employee.json; exit 1; }
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees?companyId=$COMPANY_ID" | grep -q 'CI-001'
+EMP_ID="$(python3 -c 'import json; print(json.load(open("/tmp/hrm-ci-employee.json"))["id"])')"
+CHANGE_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-ci-employment.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"effectiveDate":"2026-04-01","status":"ON_LEAVE","type":"REGULAR","jobTitle":"Analyst","reason":"Approved leave"}' "$BASE/api/v1/personnel/employees/$EMP_ID/employment")"
+test "$CHANGE_HTTP" = 201 || { echo "Employment change failed: $CHANGE_HTTP"; cat /tmp/hrm-ci-employment.json; exit 1; }
+curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/personnel/employees/$EMP_ID/employment" | grep -q 'ON_LEAVE'
 REVOKED="$(curl -sS -X DELETE -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/security/tokens/current")"
 test "$REVOKED" = 204 || { echo "Token revoke returned $REVOKED"; exit 1; }
 AFTER="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
