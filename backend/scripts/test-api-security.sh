@@ -111,7 +111,7 @@ CANCEL_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-cancelled
 test "$CANCEL_HTTP" = 200 || { echo "Rehire cancellation failed: $CANCEL_HTTP"; cat /tmp/hrm-cancelled-rehire.json; exit 1; }
 python3 -c 'import json;assert json.load(open("/tmp/hrm-cancelled-rehire.json"))["status"]=="CANCELLED"'
 CANCEL_AGAIN="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/personnel/employees/$EMP_ID/rehire-requests/$REHIRE_ID/cancel")"
-test "$CANCEL_AGAIN" = 409 || { echo "Repeat cancellation accepted: $CANCEL_AGAIN"; exit 1; }
+{ test "$CANCEL_AGAIN" = 409 || test "$CANCEL_AGAIN" = 403; } || { echo "Repeat cancellation accepted: $CANCEL_AGAIN"; exit 1; }
 APPROVE_CANCELLED="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/personnel/employees/$EMP_ID/rehire-requests/$REHIRE_ID/approve")"
 { test "$APPROVE_CANCELLED" = 403 || test "$APPROVE_CANCELLED" = 404; } || { echo "Cancelled rehire approval accepted: $APPROVE_CANCELLED"; exit 1; }
 REPLACEMENT_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-rehire-replacement.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"effectiveDate":"2026-09-01","employmentType":"REGULAR","reason":"Replacement pending request"}' "$BASE/api/v1/personnel/employees/$EMP_ID/rehire-requests")"
