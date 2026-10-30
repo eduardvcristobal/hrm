@@ -40,6 +40,7 @@ public class UserAdministrationController {
     public void addRole(@PathVariable UUID id,@PathVariable Role role,
             @AuthenticationPrincipal HrmUserPrincipal actor) {
         tenants.inTenant(actor.tenantId(),()->{
+            guardOwnerRoleManagement(actor,role);
             requireUser(actor,id);
             jdbc.update("""
                 INSERT INTO auth_identity_role(identity_id,role) VALUES (?,?)
@@ -56,6 +57,7 @@ public class UserAdministrationController {
             @AuthenticationPrincipal HrmUserPrincipal actor) {
         tenants.inTenant(actor.tenantId(),()->{
             lockTenantAdministration(actor.tenantId());
+            guardOwnerRoleManagement(actor,role);
             requireUser(actor,id);
             if (role == Role.TENANT_ADMIN) guardLastAdmin(actor,id);
             jdbc.update("DELETE FROM auth_identity_role WHERE identity_id=? AND role=?",id,role.name());
@@ -72,6 +74,8 @@ public class UserAdministrationController {
         tenants.inTenant(actor.tenantId(),()->{
             lockTenantAdministration(actor.tenantId());
             requireUser(actor,id);
+            if (!isTenantAdmin(actor) && hasRole(id, Role.TENANT_ADMIN))
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,"HR administrators cannot suspend a workspace owner");
             if (!input.enabled()) guardLastAdmin(actor,id);
             jdbc.update("UPDATE auth_identity SET enabled=? WHERE tenant_id=? AND id=?",
                 input.enabled(),actor.tenantId(),id);
@@ -91,6 +95,17 @@ public class UserAdministrationController {
         Integer n=jdbc.queryForObject("SELECT count(*) FROM auth_identity WHERE tenant_id=? AND id=?",
             Integer.class,actor.tenantId(),id);
         if(n==null || n==0) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    }
+    private void guardOwnerRoleManagement(HrmUserPrincipal actor, Role role) {
+        if(role==Role.TENANT_ADMIN && !isTenantAdmin(actor))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Only a workspace owner can assign or remove owner access");
+    }
+    private boolean isTenantAdmin(HrmUserPrincipal actor) {
+        return actor.getAuthorities().stream().anyMatch(authority -> "ROLE_TENANT_ADMIN".equals(authority.getAuthority()));
+    }
+    private boolean hasRole(UUID id, Role role) {
+        Integer count=jdbc.queryForObject("SELECT count(*) FROM auth_identity_role WHERE identity_id=? AND role=?",Integer.class,id,role.name());
+        return count!=null && count>0;
     }
     private void guardLastAdmin(HrmUserPrincipal actor, UUID id) {
         // Forbid self-removal and self-deactivation; count active admins in the tenant.

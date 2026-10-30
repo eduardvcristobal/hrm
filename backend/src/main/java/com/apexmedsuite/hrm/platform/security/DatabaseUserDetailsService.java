@@ -17,12 +17,15 @@ public class DatabaseUserDetailsService implements UserDetailsService {
     @Override public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         if (username == null || username.isBlank()) throw new UsernameNotFoundException("Invalid credentials");
         var accounts = jdbc.query("""
-            SELECT id, tenant_id, email, password_hash, enabled
-            FROM auth_identity WHERE email = ?
+            SELECT i.id, i.tenant_id, i.email, i.password_hash,
+                   (i.enabled AND t.status='ACTIVE') AS enabled
+            FROM auth_identity i JOIN tenant t ON t.id=i.tenant_id
+            WHERE lower(i.email) = ? OR lower(i.username) = ?
             """, (rs, row) -> new HrmUserPrincipal(
                 rs.getObject("id", UUID.class), rs.getObject("tenant_id", UUID.class),
                 rs.getString("email"), rs.getString("password_hash"), rs.getBoolean("enabled"),
-                List.of()), username.trim().toLowerCase(java.util.Locale.ROOT));
+                List.of()), username.trim().toLowerCase(java.util.Locale.ROOT),
+                username.trim().toLowerCase(java.util.Locale.ROOT));
         if (accounts.isEmpty()) throw new UsernameNotFoundException("Invalid credentials");
         var account = accounts.get(0);
         var roles = jdbc.query("SELECT role FROM auth_identity_role WHERE identity_id = ?",

@@ -22,7 +22,11 @@ public class ApiTokenService {
             .digest(token.getBytes(StandardCharsets.UTF_8)));}
         catch(java.security.NoSuchAlgorithmException ex){throw new IllegalStateException(ex);}
     }
-    public record Token(String value,Instant expiresAt) {}
+    public record Token(String value,Instant expiresAt) {
+        @Override public String toString() {
+            return "Token[value=[REDACTED], expiresAt="+expiresAt+"]";
+        }
+    }
     public Token issue(HrmUserPrincipal principal,boolean mfaVerified) {
         byte[] bytes=new byte[32];RANDOM.nextBytes(bytes);
         String raw=HexFormat.of().formatHex(bytes);
@@ -34,7 +38,8 @@ public class ApiTokenService {
     public HrmUserPrincipal authenticate(String raw) {
         var rows=jdbc.query("""
             SELECT i.email,t.mfa_verified FROM auth_api_token t JOIN auth_identity i ON i.id=t.identity_id
-            WHERE t.token_sha256=? AND t.revoked_at IS NULL AND t.expires_at>now() AND i.enabled
+            JOIN tenant w ON w.id=i.tenant_id
+            WHERE t.token_sha256=? AND t.revoked_at IS NULL AND t.expires_at>now() AND i.enabled AND w.status='ACTIVE'
             """,(rs,n)->new TokenIdentity(rs.getString(1),rs.getBoolean(2)),hash(raw));
         if(rows.size()!=1) return null;
         var user=(HrmUserPrincipal)users.loadUserByUsername(rows.get(0).email());
