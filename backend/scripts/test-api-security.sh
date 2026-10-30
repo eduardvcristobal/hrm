@@ -107,6 +107,16 @@ SELF_APPROVAL="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{
 test "$SELF_APPROVAL" = 403 || { echo "Same-actor rehire approval allowed: $SELF_APPROVAL"; exit 1; }
 GENERIC_REHIRE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"effectiveDate":"2026-09-01","status":"ACTIVE","type":"REGULAR","reason":"Attempted bypass"}' "$BASE/api/v1/personnel/employees/$EMP_ID/employment")"
 { test "$GENERIC_REHIRE" = 403 || test "$GENERIC_REHIRE" = 409; } || { echo "Generic rehire bypass allowed: $GENERIC_REHIRE"; exit 1; }
+CANCEL_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-cancelled-rehire.json -w '%{http_code}' -X POST "$BASE/api/v1/personnel/employees/$EMP_ID/rehire-requests/$REHIRE_ID/cancel")"
+test "$CANCEL_HTTP" = 200 || { echo "Rehire cancellation failed: $CANCEL_HTTP"; cat /tmp/hrm-cancelled-rehire.json; exit 1; }
+python3 -c 'import json;assert json.load(open("/tmp/hrm-cancelled-rehire.json"))["status"]=="CANCELLED"'
+CANCEL_AGAIN="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/personnel/employees/$EMP_ID/rehire-requests/$REHIRE_ID/cancel")"
+test "$CANCEL_AGAIN" = 409 || { echo "Repeat cancellation accepted: $CANCEL_AGAIN"; exit 1; }
+APPROVE_CANCELLED="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/personnel/employees/$EMP_ID/rehire-requests/$REHIRE_ID/approve")"
+{ test "$APPROVE_CANCELLED" = 403 || test "$APPROVE_CANCELLED" = 404; } || { echo "Cancelled rehire approval accepted: $APPROVE_CANCELLED"; exit 1; }
+REPLACEMENT_HTTP="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-rehire-replacement.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"effectiveDate":"2026-09-01","employmentType":"REGULAR","reason":"Replacement pending request"}' "$BASE/api/v1/personnel/employees/$EMP_ID/rehire-requests")"
+test "$REPLACEMENT_HTTP" = 201 || { echo "Replacement rehire failed: $REPLACEMENT_HTTP"; exit 1; }
+REHIRE_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-rehire-replacement.json"))["id"])')"
 export EMP_ID REHIRE_ID
 bash scripts/test-rehire-dual-control.sh
 source scripts/test-hr-workflows.sh
