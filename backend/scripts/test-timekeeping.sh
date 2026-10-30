@@ -45,3 +45,12 @@ CORRECTION_SELF="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '
 test "$CORRECTION_SELF" = 403 || { echo "Self approval of attendance correction accepted: $CORRECTION_SELF"; exit 1; }
 DUP_CORRECTION="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"clockInAt":"2026-10-29T09:00:00Z","clockOutAt":"2026-10-29T18:00:00Z","reason":"Duplicate correction attempt"}' "$BASE/api/v1/timekeeping/employees/$EMP_ID/attendance/$SESSION_ID/corrections")"
 { test "$DUP_CORRECTION" = 403 || test "$DUP_CORRECTION" = 409; } || { echo "Concurrent pending correction allowed: $DUP_CORRECTION"; exit 1; }
+
+# M2.3 non-payroll variance preview must reflect the effective dated shift,
+# and must not silently classify unreviewed time as payable or approved overtime.
+VARIANCE_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-variance-preview.json -w '%{http_code}' "$BASE/api/v1/timekeeping/employees/$EMP_ID/variance-preview?from=2026-11-02&to=2026-11-02")"
+test "$VARIANCE_STATUS" = 200 || { echo "Variance preview failed: $VARIANCE_STATUS"; cat /tmp/hrm-variance-preview.json; exit 1; }
+python3 -c 'import json; x=json.load(open("/tmp/hrm-variance-preview.json")); assert len(x)==1, x; r=x[0]; assert r["provisional"] and r["classification"]=="INFORMATIONAL_NOT_PAYROLL_APPROVED"; assert r["timezone"]=="Asia/Manila"; assert r["variance"]["scheduledMinutes"]==480'
+VARIANCE_LONG="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/timekeeping/employees/$EMP_ID/variance-preview?from=2026-01-01&to=2026-12-31")"
+test "$VARIANCE_LONG" = 400 || { echo "Overlong variance preview accepted: $VARIANCE_LONG"; exit 1; }
+echo "M2.3 schedule variance HTTP regression passed"
