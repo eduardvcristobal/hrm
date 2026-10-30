@@ -1,28 +1,12 @@
 {
-  "name": "hrm-personnel-web",
   "name": "apex-hrm-frontend",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 0.0.0.0",
-    "test:e2e": "playwright test"
-  },
-  "dependencies": {
-    "react": "19.1.1",
-    "react-dom": "19.1.1"
-  },
-  "devDependencies": {
-    "@types/react": "19.1.8",
-    "@types/react-dom": "19.1.6",
-    "typescript": "5.8.3",
-    "vite": "7.0.0",
-    "@playwright/test": "1.56.0"
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.5",
