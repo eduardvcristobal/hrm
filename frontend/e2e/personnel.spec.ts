@@ -43,7 +43,7 @@ test("loads company-scoped directory and organization catalogs", async ({ page }
   await expect(page.getByText("Directory synchronized.")).toBeVisible();
   await page.getByRole("button", { name: "Profile" }).click();
   await expect(page.getByRole("heading", { name: "Employee profile" })).toBeVisible();
-  await expect(page.getByText("Ali")).toBeVisible();
+  await expect(page.getByText("Ali", { exact: true })).toBeVisible();
 });
 
 test("registers employee in the connected company", async ({ page }) => {
