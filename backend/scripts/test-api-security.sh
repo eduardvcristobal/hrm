@@ -34,6 +34,19 @@ REVOKED="$(curl -sS -X DELETE -H "Authorization: Bearer $BEARER" -o /dev/null -w
 test "$REVOKED" = 204 || { echo "Token revoke returned $REVOKED"; exit 1; }
 AFTER="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
 test "$AFTER" = 401 || { echo "Revoked token still authenticates: $AFTER"; exit 1; }
+# MFA enrollment and replay checks for the privileged CI account.
+ENROLL="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /tmp/hrm-mfa.json -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" "$BASE/api/v1/security/mfa/enroll")"
+test "$ENROLL" = 201 || { echo "MFA enrollment failed: $ENROLL"; cat /tmp/hrm-mfa.json; exit 1; }
+SECRET="$(python3 -c 'import json; print(json.load(open("/tmp/hrm-mfa.json"))["secretHex"])')"
+export SECRET
+export STEP="$(python3 -c 'import time; print(int(time.time()//30))')"
+OTP="$(python3 -c 'import os,hmac,hashlib,struct; k=bytes.fromhex(os.environ["SECRET"]); c=int(os.environ["STEP"]); d=hmac.new(k,struct.pack(">Q",c),hashlib.sha1).digest(); i=d[-1]&15; print(f"{(struct.unpack(">I",d[i:i+4])[0]&0x7fffffff)%1000000:06d}")')"
+CONFIRMED="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" -H 'Content-Type: application/json' --data "{\\"code\\":\\"$OTP\\"}" "$BASE/api/v1/security/mfa/confirm")"
+test "$CONFIRMED" = 204 || { echo "MFA confirmation failed: $CONFIRMED"; exit 1; }
+REPLAY="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" "$BASE/api/v1/security/tokens" -H "X-TOTP-Code: $OTP")"
+test "$REPLAY" = 401 || { echo "MFA replay not blocked: $REPLAY"; exit 1; }
+UNVERIFIED="$(curl -sS -u "$AUTH" -b "$COOKIE" -c "$COOKIE" -o /dev/null -w '%{http_code}' -X POST -H "X-CSRF-TOKEN: $TOKEN" "$BASE/api/v1/security/tokens")"
+test "$UNVERIFIED" = 401 || { echo "MFA-less issuance not blocked: $UNVERIFIED"; exit 1; }
 for i in $(seq 1 10); do
   BAD="$(curl -sS -u 'admin-ci@example.test:incorrect-password' -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
   test "$BAD" = 401 || { echo "Invalid login should return 401, got $BAD"; exit 1; }
