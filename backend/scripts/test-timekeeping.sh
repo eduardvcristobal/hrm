@@ -54,3 +54,23 @@ python3 -c 'import json; x=json.load(open("/tmp/hrm-variance-preview.json")); as
 VARIANCE_LONG="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/timekeeping/employees/$EMP_ID/variance-preview?from=2026-01-01&to=2026-12-31")"
 { test "$VARIANCE_LONG" = 400 || test "$VARIANCE_LONG" = 403; } || { echo "Overlong variance preview accepted: $VARIANCE_LONG"; exit 1; }
 echo "M2.3 schedule variance HTTP regression passed"
+
+# M2.4 independent, MFA-verified reviewer positive path.
+: "${SECOND_BEARER:?Second MFA-verified reviewer token missing}"
+CORRECTION_PATH="$BASE/api/v1/timekeeping/employees/$EMP_ID/attendance/$SESSION_ID/corrections"
+APPROVED_CODE="$(curl -sS -H "Authorization: Bearer $SECOND_BEARER" -o /tmp/hrm-m2-approved.json -w '%{http_code}' -X POST "$CORRECTION_PATH/$CORRECTION_ID/decision?decision=APPROVED")"
+test "$APPROVED_CODE" = 200 || { echo "Independent attendance approval failed: $APPROVED_CODE"; cat /tmp/hrm-m2-approved.json; exit 1; }
+python3 -c 'import json; x=json.load(open("/tmp/hrm-m2-approved.json")); assert x["status"]=="APPROVED" and x["requestedBy"]!=x["reviewedBy"]'
+curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/timekeeping/employees/$EMP_ID/attendance" > /tmp/hrm-m2-approved-sessions.json
+python3 -c 'import json,sys; x=next(i for i in json.load(open("/tmp/hrm-m2-approved-sessions.json")) if i["id"]==sys.argv[1]); assert x["clockInAt"]=="2026-10-29T08:00:00Z" and x["clockOutAt"]=="2026-10-29T17:00:00Z"' "$SESSION_ID"
+REPLAY_DECISION="$(curl -sS -H "Authorization: Bearer $SECOND_BEARER" -o /dev/null -w '%{http_code}' -X POST "$CORRECTION_PATH/$CORRECTION_ID/decision?decision=APPROVED")"
+test "$REPLAY_DECISION" = 409 || { echo "Repeated approval allowed: $REPLAY_DECISION"; exit 1; }
+REJECT_REQUEST="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-m2-reject-pending.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"clockInAt":"2026-10-29T09:00:00Z","clockOutAt":"2026-10-29T18:00:00Z","reason":"Independent rejection regression"}' "$CORRECTION_PATH")"
+test "$REJECT_REQUEST" = 201 || { echo "Rejection fixture failed: $REJECT_REQUEST"; cat /tmp/hrm-m2-reject-pending.json; exit 1; }
+REJECT_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-m2-reject-pending.json"))["id"])')"
+REJECT_CODE="$(curl -sS -H "Authorization: Bearer $SECOND_BEARER" -o /tmp/hrm-m2-rejected.json -w '%{http_code}' -X POST "$CORRECTION_PATH/$REJECT_ID/decision?decision=REJECTED")"
+test "$REJECT_CODE" = 200 || { echo "Independent rejection failed: $REJECT_CODE"; cat /tmp/hrm-m2-rejected.json; exit 1; }
+python3 -c 'import json; x=json.load(open("/tmp/hrm-m2-rejected.json"));assert x["status"]=="REJECTED" and x["requestedBy"]!=x["reviewedBy"]'
+curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/timekeeping/employees/$EMP_ID/attendance" > /tmp/hrm-m2-rejected-sessions.json
+python3 -c 'import json,sys; x=next(i for i in json.load(open("/tmp/hrm-m2-rejected-sessions.json")) if i["id"]==sys.argv[1]); assert x["clockInAt"]=="2026-10-29T08:00:00Z" and x["clockOutAt"]=="2026-10-29T17:00:00Z"' "$SESSION_ID"
+echo "M2.4 independent approval/rejection and replay HTTP regression passed"
