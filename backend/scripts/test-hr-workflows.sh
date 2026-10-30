@@ -47,6 +47,9 @@ test "$UPLOAD_STATUS" = 201 || { echo "Document upload failed: $UPLOAD_STATUS"; 
 DOC_CONTENT_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-uploaded-document.json"))["id"])')"
 QUARANTINE_DOWNLOAD="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/content")"
 { test "$QUARANTINE_DOWNLOAD" = 404 || test "$QUARANTINE_DOWNLOAD" = 403; } || { echo "Quarantined document accessible: $QUARANTINE_DOWNLOAD"; exit 1; }
+SCAN_ERROR="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-scan-result.txt -w '%{http_code}' -X POST "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/scan")"
+test "$SCAN_ERROR" = 200 || { echo "Scan endpoint failed: $SCAN_ERROR"; exit 1; }
+grep -q 'ERROR' /tmp/hrm-scan-result.txt || { echo "No scanner should fail closed"; exit 1; }
 SELF_REVIEW="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"status":"RELEASED"}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/review")"
 test "$SELF_REVIEW" = 403 || { echo "Document uploader self-reviewed: $SELF_REVIEW"; exit 1; }
 ANON_DOCUMENT="$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/api/v1/personnel/employees/$EMP_ID/documents/$DOC_CONTENT_ID/content")"
