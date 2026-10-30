@@ -25,8 +25,8 @@ public class SupervisorController {
                              @PathVariable UUID employeeId,@RequestBody UpdateSupervisor input) {
         return tenants.inTenant(user.tenantId(),()->{
             // Serialize changes to reporting lines within a tenant to prevent concurrent cycles.
-            jdbc.queryForObject("SELECT pg_advisory_xact_lock(hashtext(?))",Long.class,
-                    "personnel-reporting:"+user.tenantId());
+            jdbc.query("SELECT pg_advisory_xact_lock(hashtext(?))",
+                    (rs,n)->rs.getObject(1),"personnel-reporting:"+user.tenantId());
             List<UUID> companies=jdbc.query("""
                 SELECT company_id FROM personnel_employee WHERE tenant_id=? AND id=? FOR UPDATE
                 """,(rs,n)->rs.getObject(1,UUID.class),user.tenantId(),employeeId);
