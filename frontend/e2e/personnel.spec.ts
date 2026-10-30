@@ -29,5 +29,5 @@ test('account recovery is available from staff login', async ({ page }) => {
 
 test('unknown dashboard access presents sign-in', async ({ page }) => {
   await page.goto('/dashboard');
-  await expect(page.getByRole('link',{name:'Return to sign in'})).toBeVisible();
+  await expect(page.getByLabel('Email or username')).toBeVisible();
 });
