@@ -1,4 +1,5 @@
 -- M1.10.1: same-company reporting relationships.
+ALTER TABLE personnel_employee ADD CONSTRAINT uq_personnel_employee_company_id UNIQUE(tenant_id,company_id,id);
 ALTER TABLE personnel_employee ADD COLUMN supervisor_id uuid;
 ALTER TABLE personnel_employee ADD CONSTRAINT fk_personnel_supervisor_company
  FOREIGN KEY(tenant_id,company_id,supervisor_id)
