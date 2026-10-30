@@ -40,12 +40,14 @@ public class FinalPayHandoffController {
             if(cases.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Separation case not found");
             if(!cases.get(0).equals("APPROVED"))
                 throw new ResponseStatusException(HttpStatus.CONFLICT,"Final-pay handoff requires approved separation");
-            Handoff result=jdbc.queryForObject("""
+            jdbc.update("""
                 INSERT INTO personnel_final_pay_handoff(tenant_id,employee_id,hr_case_id,created_by)
-                VALUES(?,?,?,?)
-                ON CONFLICT(tenant_id,hr_case_id) DO UPDATE SET hr_case_id=EXCLUDED.hr_case_id
-                RETURNING id,employee_id,hr_case_id,status,created_by,acknowledged_by
-                """,(rs,n)->map(rs),user.tenantId(),employeeId,caseId,user.id());
+                VALUES(?,?,?,?) ON CONFLICT(tenant_id,hr_case_id) DO NOTHING
+                """,user.tenantId(),employeeId,caseId,user.id());
+            Handoff result=jdbc.queryForObject("""
+                SELECT id,employee_id,hr_case_id,status,created_by,acknowledged_by
+                FROM personnel_final_pay_handoff WHERE tenant_id=? AND employee_id=? AND hr_case_id=?
+                """,(rs,n)->map(rs),user.tenantId(),employeeId,caseId);
             jdbc.update("""
                 INSERT INTO audit_event(tenant_id,actor_id,action,entity_type,entity_id)
                 VALUES(?,?,'FINAL_PAY_HANDOFF_REQUESTED','personnel_final_pay_handoff',?)
