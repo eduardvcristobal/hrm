@@ -51,6 +51,31 @@ public class PositionController {
             return position;
         });
     }
+    public record Status(boolean active) {}
+    @PatchMapping("/{id}/status")
+    public Position status(@AuthenticationPrincipal HrmUserPrincipal user,@PathVariable UUID id,
+                           @RequestBody Status status) {
+        return tenants.inTenant(user.tenantId(),()->{
+            if(!status.active()) {
+                Integer assigned=jdbc.queryForObject("""
+                    SELECT count(*) FROM personnel_employee
+                    WHERE tenant_id=? AND position_id=? AND employment_status IN ('ACTIVE','ON_LEAVE')
+                    """,Integer.class,user.tenantId(),id);
+                if(assigned!=null&&assigned>0)
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,"Active employees use this position");
+            }
+            List<Position> changed=jdbc.query("""
+                UPDATE personnel_position SET active=? WHERE tenant_id=? AND id=?
+                RETURNING id,company_id,position_code,position_name,active
+                """,(rs,n)->row(rs),status.active(),user.tenantId(),id);
+            if(changed.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Position not found");
+            jdbc.update("""
+                INSERT INTO audit_event(tenant_id,actor_id,action,entity_type,entity_id)
+                VALUES(?,?,'POSITION_STATUS_CHANGED','personnel_position',?)
+                """,user.tenantId(),user.id(),id);
+            return changed.get(0);
+        });
+    }
     private static Position row(java.sql.ResultSet rs) throws java.sql.SQLException {
         return new Position(rs.getObject("id",UUID.class),rs.getObject("company_id",UUID.class),
             rs.getString("position_code"),rs.getString("position_name"),rs.getBoolean("active"));
