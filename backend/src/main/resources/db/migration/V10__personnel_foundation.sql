@@ -1,4 +1,5 @@
 -- M1.1: Tenant-isolated personnel masterfile foundation. No API routes activated.
+ALTER TABLE branch ADD CONSTRAINT uq_branch_tenant_id UNIQUE (tenant_id,id);
 CREATE TABLE personnel_department (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  tenant_id uuid NOT NULL REFERENCES tenant(id),
