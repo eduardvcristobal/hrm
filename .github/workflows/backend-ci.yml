@@ -37,3 +37,18 @@ jobs:
           cache-dependency-path: backend/pom.xml
       - name: Compile and run tests
         run: mvn -B verify
+      - name: Boot application and verify two-tenant RLS
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B spring-boot:run > /tmp/hrm-boot.log 2>&1 &
+          APP_PID=$!
+          trap 'kill "$APP_PID" 2>/dev/null || true; tail -100 /tmp/hrm-boot.log' EXIT
+          READY=0
+          for i in {1..90}; do
+            if curl -fsS http://localhost:8080/actuator/health >/dev/null; then READY=1; break; fi
+            if ! kill -0 "$APP_PID" 2>/dev/null; then break; fi
+            sleep 2
+          done
+          if [ "$READY" -ne 1 ]; then echo "Application startup failed"; exit 1; fi
+          PGPASSWORD="$DB_PASSWORD" psql -X -v ON_ERROR_STOP=1 -h localhost -p 5433 -U "$DB_USERNAME" -d hrm_dev -f scripts/test-tenant-rls.sql
