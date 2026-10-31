@@ -43,6 +43,7 @@ test "$NEW_LEAVE_STATUS" = 201 || { echo "Employee leave creation failed: $NEW_L
 SELF_LEAVE_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-m29-newleave.json"))["id"])')"
 APPROVAL_STATUS="$(curl -sS -H "Authorization: Bearer $SECOND_BEARER" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/timekeeping/employees/$EMP_ID/leave-requests/$SELF_LEAVE_ID/decision?decision=APPROVED")"
 test "$APPROVAL_STATUS" = 200 || { echo "Independent HR review failed: $APPROVAL_STATUS"; exit 1; }
+source scripts/test-device-security.sh
 # Revoking the link must instantly deny the same still-valid employee bearer token.
 REVOKE_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-m29-revoked.json -w '%{http_code}' -X POST "$ES_BASE/admin/identity-links/$LINK_ID/revoke")"
 test "$REVOKE_STATUS" = 200 || { echo "Link revocation failed: $REVOKE_STATUS"; cat /tmp/hrm-m29-revoked.json; exit 1; }
