@@ -3,7 +3,7 @@ package com.apexmedsuite.hrm.timekeeping;
 import com.apexmedsuite.hrm.platform.security.HrmUserPrincipal;
 import com.apexmedsuite.hrm.platform.tenant.TenantJdbcExecutor;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.*;
 import java.time.LocalDate;
 import java.util.*;
 import org.springframework.http.HttpStatus;
@@ -34,6 +34,10 @@ public class EmployeeSelfServiceController {
                            LocalDate effectiveUntil,int weekdaysMask){}
     public record Leave(UUID id,UUID leaveTypeId,LocalDate startsOn,LocalDate endsOn,String status){}
     public record Attendance(UUID id,java.time.Instant clockInAt,java.time.Instant clockOutAt){}
+    public record NewLeaveRequest(@NotNull UUID leaveTypeId,@NotNull LocalDate from,
+                                  @NotNull LocalDate to,
+                                  @NotBlank @Size(min=8,max=500) String reason) {}
+
     public record Summary(Profile employee,List<Schedule> schedules,List<Leave> leaveRequests,
                           List<Attendance> attendanceSessions,
                           boolean clockInEnabled,boolean locationCaptureEnabled,
@@ -109,6 +113,57 @@ public class EmployeeSelfServiceController {
                 """,actor.id(),actor.tenantId(),linkId);
             audit(actor,"TIME_ESS_IDENTITY_REVOKED","time_employee_identity_link",linkId);
             return rows.get(0);
+        });
+    }
+
+    @PostMapping("/leave-requests")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Leave submitLeave(@AuthenticationPrincipal HrmUserPrincipal actor,
+                             @Valid @RequestBody NewLeaveRequest input){
+        if(input.to().isBefore(input.from())||input.to().isAfter(input.from().plusDays(365)))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid leave date range");
+        return tenants.inTenant(actor.tenantId(),()->{
+            // Resolves employee solely from signed-in identity. Employee row lock
+            // serializes parallel requests and the existing admin leave workflow.
+            List<Profile> profiles=jdbc.query("""
+                SELECT e.id,e.company_id,e.employee_number,e.first_name,e.last_name,e.employment_status
+                FROM time_employee_identity_link l
+                JOIN personnel_employee e ON e.tenant_id=l.tenant_id AND e.id=l.employee_id
+                WHERE l.tenant_id=? AND l.identity_id=? AND l.revoked_at IS NULL
+                FOR UPDATE OF e
+                """,(rs,n)->new Profile(rs.getObject("id",UUID.class),
+                    rs.getObject("company_id",UUID.class),rs.getString("employee_number"),
+                    rs.getString("first_name"),rs.getString("last_name"),rs.getString("employment_status")),
+                actor.tenantId(),actor.id());
+            if(profiles.size()!=1||!List.of("ACTIVE","ON_LEAVE").contains(profiles.get(0).employmentStatus()))
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Verified active employee required");
+            Profile employee=profiles.get(0);
+            Integer type=jdbc.queryForObject("""
+                SELECT count(*) FROM time_leave_type
+                WHERE tenant_id=? AND company_id=? AND id=? AND active=true
+                """,Integer.class,actor.tenantId(),employee.companyId(),input.leaveTypeId());
+            if(type==null||type!=1)
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Leave type not available in employee company");
+            Integer overlap=jdbc.queryForObject("""
+                SELECT count(*) FROM time_leave_request
+                WHERE tenant_id=? AND employee_id=? AND status IN ('PENDING','APPROVED')
+                  AND starts_on<=? AND ends_on>=?
+                """,Integer.class,actor.tenantId(),employee.employeeId(),input.to(),input.from());
+            if(overlap!=null&&overlap>0)
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"Overlapping leave request");
+            Leave leave=jdbc.queryForObject("""
+                INSERT INTO time_leave_request
+                  (tenant_id,employee_id,leave_type_id,starts_on,ends_on,reason,requested_by)
+                VALUES(?,?,?,?,?,?,?)
+                RETURNING id,leave_type_id,starts_on,ends_on,status
+                """,(rs,n)->new Leave(rs.getObject("id",UUID.class),
+                    rs.getObject("leave_type_id",UUID.class),
+                    rs.getObject("starts_on",LocalDate.class),
+                    rs.getObject("ends_on",LocalDate.class),rs.getString("status")),
+                actor.tenantId(),employee.employeeId(),input.leaveTypeId(),
+                input.from(),input.to(),input.reason().trim(),actor.id());
+            audit(actor,"TIME_ESS_LEAVE_REQUESTED","time_leave_request",leave.id());
+            return leave;
         });
     }
 
