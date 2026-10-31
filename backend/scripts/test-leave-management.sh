@@ -42,3 +42,6 @@ echo "M2.5 leave type, independent approval/rejection, overlap, replay, cancella
 
 # Continue with M2.5.1 policy and accrual coverage after leave fixtures exist.
 source scripts/test-leave-credits.sh
+
+# M2.7 internal-only payroll source reconciliation after leave/calendar fixtures.
+source scripts/test-payroll-reconciliation.sh
