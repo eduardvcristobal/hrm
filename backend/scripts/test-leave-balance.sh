@@ -5,6 +5,11 @@ ROOT="$BASE/api/v1/timekeeping/employees/$EMP_ID/leave-balances"
 BEFORE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-leave-before.json -w '%{http_code}' "$ROOT")"
 test "$BEFORE" = 200 || { echo "Leave balance read failed: $BEFORE"; exit 1; }
 python3 -c 'import json,sys; b=next(x for x in json.load(open("/tmp/hrm-leave-before.json")) if x["leaveTypeId"]==sys.argv[1]); assert float(b["accruedDays"])==1.25 and float(b["consumedDays"])==0 and float(b["remainingDays"])==1.25;assert b["payable"] is False and b["policyCertified"] is False' "$LEAVE_TYPE_ID"
+# A cancelled request cannot spend credits, and an approved request cannot overdraw.
+CANCELLED_DEBIT="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"days":1.000,"note":"Cancelled leave must never be charged"}' "$ROOT/requests/$CANCEL_ID/consume")"
+{ test "$CANCELLED_DEBIT" = 403 || test "$CANCELLED_DEBIT" = 409; } || { echo "Cancelled leave was consumed: $CANCELLED_DEBIT"; exit 1; }
+OVERDRAW="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"days":2.000,"note":"Balance overdraw must not be posted"}' "$ROOT/requests/$LEAVE_ID/consume")"
+{ test "$OVERDRAW" = 403 || test "$OVERDRAW" = 409; } || { echo "Insufficient leave credit was consumed: $OVERDRAW"; exit 1; }
 DEBIT="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-leave-debit.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"days":1.000,"note":"Manually reviewed chargeable leave day"}' "$ROOT/requests/$LEAVE_ID/consume")"
 test "$DEBIT" = 201 || { echo "Approved leave debit failed: $DEBIT"; cat /tmp/hrm-leave-debit.json; exit 1; }
 DEBIT_ID="$(python3 -c 'import json; r=json.load(open("/tmp/hrm-leave-debit.json"));assert r["eventType"]=="DEBIT" and float(r["days"])==1;print(r["id"])')"
