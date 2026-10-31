@@ -57,6 +57,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/admin/invitations", "/api/v1/admin/invitations/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
                 .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
                 .requestMatchers("/api/v1/companies", "/api/v1/companies/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
+                // M3 payroll is intentionally DRAFT-only; no pay calculation or release API.
+                .requestMatchers("/api/v1/payroll/**")
+                    .hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
                 .requestMatchers("/api/v1/personnel/employees/*/hr-cases", "/api/v1/personnel/employees/*/hr-cases/**",
                     "/api/v1/personnel/employees/*/documents", "/api/v1/personnel/employees/*/documents/**")
                     .hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
