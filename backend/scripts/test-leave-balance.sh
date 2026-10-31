@@ -24,3 +24,6 @@ python3 -c 'import json,sys; a=json.load(open("/tmp/hrm-leave-events.json"));ass
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/audit-logs?limit=500" > /tmp/hrm-leave-journal-audit.json
 python3 -c 'import json,sys; a=json.load(open("/tmp/hrm-leave-journal-audit.json"));assert all(any(x["entityId"]==i and x["action"]==action for x in a) for i,action in [(sys.argv[1],"TIME_LEAVE_BALANCE_DEBIT"),(sys.argv[2],"TIME_LEAVE_BALANCE_REVERSAL")])' "$DEBIT_ID" "$REVERSAL_ID"
 echo "M2.5.2 approved consumption, reversal, duplicate protection and audit HTTP regression passed"
+
+# Preview future-year carryover cap; no change to earned or consumed credits.
+source scripts/test-leave-carryover.sh
