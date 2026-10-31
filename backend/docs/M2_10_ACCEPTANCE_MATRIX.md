@@ -58,3 +58,9 @@ A dedicated CI job (`replica-certification` in `.github/workflows/backend-ci.yml
 `backend/scripts/test-m2-replica-load.py` alternates employee-authenticated reads across both JVMs with shared PostgreSQL; checks identity isolation and disabled attendance capture flags; and submits one identical device attestation nonce concurrently from both application processes. Exactly one successful attestation is permitted. Result JSON and JVM logs are retained as the `m210-dual-jvm-evidence` GitHub Actions artifact (14 days).
 
 **Limits:** This is *two processes on one shared GitHub runner and database*, not multiple physical hosts, independent database replicas, an external load balancer, a sustained peak-traffic capacity test, or proof of outage recovery. The 5,000 ms p95 is an intentionally generous CI regression limit, **not** an operations-approved SLA. Production is still NO-GO.
+
+### M2.10.3 paced traffic extension
+
+The CI dual-JVM check additionally runs a **bounded ~20-second, 800-request paced read scenario with 20 workers** (500 ms pacing per worker), alternating requests between both processes, recording per-replica error counts, observed requests/second, mean and p50/p95/p99/max. It then sends 20 simultaneous identical nonce proofs across the two JVMs; exactly one may be accepted. A temporary `m210-dual-jvm-evidence` artifact contains the JSON and separate JVM logs. The harness is intentionally bounded to at most 2,000 requests and 40 workers.
+
+This is a **synthetic sustained CI regression**, not a representative 24-hour soak, real production-volume traffic, a cross-host network partition test, a full active-active disaster drill or certified payroll/attendance release. Hardware, traffic distribution and capacity are specific to the GitHub-hosted runner; performance thresholds remain provisional.
