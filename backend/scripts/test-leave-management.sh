@@ -45,3 +45,6 @@ source scripts/test-leave-credits.sh
 
 # M2.7 internal-only payroll source reconciliation after leave/calendar fixtures.
 source scripts/test-payroll-reconciliation.sh
+
+# M2.8 reporting and retention verification after synthetic company and attendance fixtures.
+source scripts/test-reporting-retention.sh
