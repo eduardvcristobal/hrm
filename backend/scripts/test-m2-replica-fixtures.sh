@@ -7,7 +7,7 @@ export M210_DEVICE_SECRET="$(openssl rand -hex 32)"
 TOKEN_HASH="$(printf '%s' "$M210_EMP_TOKEN" | sha256sum | cut -d' ' -f1)"
 DEVICE_HASH="$(printf '%s' "$M210_DEVICE_SECRET" | sha256sum | cut -d' ' -f1)"
 export M210_EMP_TOKEN M210_DEVICE_SECRET
-PGPASSWORD="$DB_PASSWORD" psql -X -v ON_ERROR_STOP=1 -h localhost -p 5433 -U "$DB_USERNAME" -d hrm_dev -v token_hash="$TOKEN_HASH" -v device_hash="$DEVICE_HASH" <<'SQL'
+PGPASSWORD="$DB_PASSWORD" psql -X -t -A -v ON_ERROR_STOP=1 -h localhost -p 5433 -U "$DB_USERNAME" -d hrm_dev -v token_hash="$TOKEN_HASH" -v device_hash="$DEVICE_HASH" <<'SQL'
 BEGIN;
 INSERT INTO tenant(slug,display_name) VALUES('m210-replica-ci','M2.10 Synthetic Replica CI');
 INSERT INTO auth_identity(tenant_id,email,password_hash,enabled)
