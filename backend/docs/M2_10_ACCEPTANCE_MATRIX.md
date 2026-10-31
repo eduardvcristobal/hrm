@@ -1,0 +1,35 @@
+# M2.10 — Timekeeping & Attendance Acceptance Matrix
+
+**Status: NO-GO.** This document describes gates and their automation coverage. CI success verifies the specific automated tests, **not** regulatory, operational or clinical/personal-data approval.
+
+**Branch:** `feature/m2-timekeeping-attendance`. **Draft PR:** https://github.com/eduardvcristobal/hrm/pull/4. **Production data:** prohibited until human sign-off.
+
+| Gate | Automated evidence in repository | Unverified / manual acceptance | Status |
+|---|---|---|---|
+| Tenant authorization and MFA | `backend/scripts/test-tenant-rls.sql`, `test-api-security.sh`, `test-employee-self-service.sh` | Two independent live tenants with real role matrices; external penetration test | **NO-GO** |
+| Employee identity and scope | `test-employee-self-service.sh`: unlinked denial, admin binding, revoked link, self-service employee-only API | Onboarding identity proofing and revocation SLA sign-off | **NO-GO** |
+| Schedule, timezone, DST | `test-timekeeping.sh`, `AttendanceVarianceCalculatorTest.java`, `test-calendar-policy.sh` | HR certification for all configured company calendars, overnight shifts and holidays | **NO-GO** |
+| Leave policies and payments | `test-leave-management.sh`, `test-leave-balance.sh`, `test-leave-credits.sh` | Legal validation of local entitlements, holidays, cutoffs, carryover and paid leave | **NO-GO** |
+| Attendance corrections | `test-timekeeping.sh`: independent review, concurrency/replay and immutable source checks | Multi-approver audits and payroll sign-off | **NO-GO** |
+| Payroll handoff | `test-payroll-reconciliation.sh` | Payable-hours logic, export contracts, negative testing, payroll-provider release control | **NO-GO** |
+| Controlled CSV exports | `test-timekeeping-reports.sh` | Data classification, retention period and lawful-basis approval; end-to-end export-to-storage controls | **NO-GO** |
+| Employee devices | `test-device-security.sh`: independent approval, one-time secret, MFA, token/nonce replay and revocation | Actual hardware/OS key storage; device theft, credential rotation, anti-tampering, accessibility, recovery, regional consent | **NO-GO** |
+| Offline attendance | No enabled feature | Design offline queue deduplication, signed event envelopes, trusted time, multi-device arbitration, synchronization and redress | **NOT IMPLEMENTED** |
+| Optional location and biometrics | Database CHECK enforces disabled flags in `V46` | Privacy impact assessment, informed consent, device disclosures and retention minimization | **DISABLED** |
+| Load, backup and DR | Build/test/ClamAV CI plus RLS scripts | Quantified concurrency/load targets, p95 & p99, backup/restore drill and monitoring alert exercises | **NO-GO** |
+| Human approvals | None automatable | HR, privacy officer, security, payroll, legal and operations sign-off recorded with dated evidence | **PENDING** |
+
+## M2.10 exit criteria
+
+1. All relevant CI workflows pass on the **same** PR head SHA, including both PostgreSQL and browser checks. Failures must be addressed, not waived.
+2. Establish a two-tenant staging environment with distinct, MFA-enabled employee and admin accounts. Verify read/write isolation, including stale browser sessions, revoked identities and duplicated or modified request identifiers.
+3. Run 10-way+ concurrent attendance, correction, leave and device-attestation trials across database replicas, with documented expected/observed outcomes; add reproducible failure traces and lock-contention analysis.
+4. Measure load and response distributions under documented hardware, database and dataset assumptions. Agree SLA/SLO thresholds with operations before certification.
+5. Record actual backup encryption, off-site storage, disaster restore RTO/RPO and incident/alert tests.
+6. Independently certify local labor, privacy and payroll policies. **Do not infer paid hours** from raw attendance timestamps.
+7. Review mobile accessibility, offline recovery and customer support procedures; retain a signed UAT artifact. Do not enable unsupported device functions as shortcuts.
+8. Obtain explicit human approval before removing NO-GO and making PR ready to merge. **Do not merge PR automatically.**
+
+## Current automation coverage interpretation
+
+The M2.9.1 device attestation is an **authentication proof only**, not a clock-in or hour record. The one-time device secret is delivered to an MFA-authenticated employee after a second-actor review. A separate secure device OS storage integration, theft recovery and cryptographic channel binding are still needed for production. A unique nonce prevents an identical device proof from being accepted twice, including simultaneous submissions; this alone does not prove a physical employee was present.
