@@ -12,12 +12,12 @@ Draft PR: https://github.com/eduardvcristobal/hrm/pull/4
 - React admin page at /timekeeping plus dashboard navigation, Playwright smoke tests. Restricted to MFA tenant administrators.
 - Fixed inherited main issues: privileged token issuance without MFA enrollment, stale frontend browser CI runner and outdated tests.
 
-Latest code verification: GitHub Actions #577 PASS (backend Maven/Flyway/PostgreSQL RLS/HTTP, frontend TypeScript/Chromium, real ClamAV): https://github.com/eduardvcristobal/hrm/actions/runs/41085003227
+Latest verified M2.4 regression: GitHub Actions workflows on commit 6dcf710d both passed (2026-10-31). M2.5 commits require their own CI verification and remain unaccepted until verified.
 
 ## Open phase work
 - M2.3 remaining: integrate variance preview in the frontend and run positive multi-role and live PostgreSQL HTTP tests; add break-punch capture, explicit overtime authorization, holiday/rest-day attribution and tested employee-specific override policies.
 - M2.4 remaining: verify new CI two-actor positive-path tests, audit export assertions, concurrent decision race and cross-tenant/multi-role isolation.
-- M2.5 leave applications, balances, accruals and approvals.
+- M2.5 foundation (in CI): V39 leave categories and effective tenant/company-scoped request lifecycle with independent second-admin approval or rejection, pending cancellation, overlap checking under employee row lock, immutable review and event audit. HTTP regression added for positive and negative paths. These endpoints are tenant-admin MFA restricted and not yet a final leave policy engine.\n- M2.5 remaining: earned balances and policy-specific accruals, scheduled/non-working day rules, half-day/hourly requests, negative balance policy, reversals, employee self-service and multi-tenant/performance certification.
 - M2.6 holidays/rest-day policy and time-zone/DST boundary validation.
 - M2.7 payroll handoff and reconciliations, separate from payroll calculations.
 - M2.8 reporting, retention and audit exports.
