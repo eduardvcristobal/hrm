@@ -62,6 +62,8 @@ public class SecurityConfig {
                     .hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
                 .requestMatchers(HttpMethod.GET, "/api/v1/employee-self-service/me")
                     .hasAllAuthorities("ROLE_EMPLOYEE","ROLE_MFA_VERIFIED")
+                .requestMatchers(HttpMethod.POST, "/api/v1/employee-self-service/leave-requests")
+                    .hasAllAuthorities("ROLE_EMPLOYEE","ROLE_MFA_VERIFIED")
                 .requestMatchers("/api/v1/employee-self-service/**").denyAll()
                 .requestMatchers("/api/v1/timekeeping/**")
                     .hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
