@@ -33,7 +33,9 @@ public class EmployeeSelfServiceController {
     public record Schedule(UUID id,UUID shiftId,LocalDate effectiveFrom,
                            LocalDate effectiveUntil,int weekdaysMask){}
     public record Leave(UUID id,UUID leaveTypeId,LocalDate startsOn,LocalDate endsOn,String status){}
+    public record Attendance(UUID id,java.time.Instant clockInAt,java.time.Instant clockOutAt){}
     public record Summary(Profile employee,List<Schedule> schedules,List<Leave> leaveRequests,
+                          List<Attendance> attendanceSessions,
                           boolean clockInEnabled,boolean locationCaptureEnabled,
                           boolean biometricCaptureEnabled,String classification){}
 
@@ -148,7 +150,16 @@ public class EmployeeSelfServiceController {
                     rs.getObject("starts_on",LocalDate.class),
                     rs.getObject("ends_on",LocalDate.class),rs.getString("status")),
                 actor.tenantId(),employeeId);
-            return new Summary(profile.get(0),schedules,leaves,
+            List<Attendance> attendance=jdbc.query("""
+                SELECT id,clock_in_at,clock_out_at FROM time_attendance_session
+                WHERE tenant_id=? AND employee_id=?
+                ORDER BY clock_in_at DESC LIMIT 100
+                """,(rs,n)->new Attendance(rs.getObject("id",UUID.class),
+                    rs.getTimestamp("clock_in_at").toInstant(),
+                    rs.getTimestamp("clock_out_at")==null?null:
+                      rs.getTimestamp("clock_out_at").toInstant()),
+                actor.tenantId(),employeeId);
+            return new Summary(profile.get(0),schedules,leaves,attendance,
                 false,false,false,"READ_ONLY_VERIFIED_EMPLOYEE_NO_DEVICE_CAPTURE");
         });
     }
