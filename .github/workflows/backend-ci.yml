@@ -64,6 +64,7 @@ jobs:
           bash scripts/test-api-security.sh
           bash scripts/test-runtime-role.sh
           PGPASSWORD="$DB_PASSWORD" psql -X -v ON_ERROR_STOP=1 -h localhost -p 5433 -U "$DB_USERNAME" -d hrm_dev -f scripts/test-personnel-rls.sql
+          PGPASSWORD="$DB_PASSWORD" psql -X -v ON_ERROR_STOP=1 -h localhost -p 5433 -U "$DB_USERNAME" -d hrm_dev -f scripts/test-payroll-rls.sql
 
   personnel-frontend:
     name: Personnel frontend build
@@ -80,10 +81,12 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Typecheck and production build
         run: npm run build
+      - name: Install pinned Playwright test runner
+        run: npm install --no-save @playwright/test@1.64.1
       - name: Install Chromium browser
         run: npx playwright install --with-deps chromium
       - name: Personnel browser smoke tests
-        run: npm run test:e2e
+        run: npx playwright test
 
   clamav-integration:
     name: Real ClamAV malware scan certification
