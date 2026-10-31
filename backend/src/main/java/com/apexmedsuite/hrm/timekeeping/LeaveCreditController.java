@@ -84,9 +84,14 @@ public class LeaveCreditController {
     @ResponseStatus(HttpStatus.CREATED)
     public Credit accrue(@AuthenticationPrincipal HrmUserPrincipal user,
                          @PathVariable UUID employeeId,
-                         @RequestParam UUID leaveTypeId,@RequestParam YearMonth month){
-        LocalDate period=month.atDay(1);
-        if(month.isAfter(YearMonth.now(java.time.ZoneOffset.UTC)))
+                         @RequestParam UUID leaveTypeId,@RequestParam String month){
+        YearMonth requested;
+        try { requested=YearMonth.parse(month); }
+        catch(java.time.format.DateTimeParseException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Month must be YYYY-MM");
+        }
+        LocalDate period=requested.atDay(1);
+        if(requested.isAfter(YearMonth.now(java.time.ZoneOffset.UTC)))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Future accrual periods are not allowed");
         return tenants.inTenant(user.tenantId(),()->{
             // Lock employee to serialize concurrent ledger postings and employment changes.
