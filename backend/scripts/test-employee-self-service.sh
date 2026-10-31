@@ -47,6 +47,7 @@ test "$APPROVAL_STATUS" = 200 || { echo "Independent HR review failed: $APPROVAL
 export EMP_TOKEN BASE EMP_ID
 python3 scripts/test-m2-load.py
 source scripts/test-device-security.sh
+source scripts/test-m2-cross-tenant-http.sh
 # Revoking the link must instantly deny the same still-valid employee bearer token.
 REVOKE_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-m29-revoked.json -w '%{http_code}' -X POST "$ES_BASE/admin/identity-links/$LINK_ID/revoke")"
 test "$REVOKE_STATUS" = 200 || { echo "Link revocation failed: $REVOKE_STATUS"; cat /tmp/hrm-m29-revoked.json; exit 1; }
