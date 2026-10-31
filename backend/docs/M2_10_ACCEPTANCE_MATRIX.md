@@ -44,3 +44,9 @@ The following checks execute against **ephemeral CI data**. They are a prerequis
 - The backend GitHub Actions workflow uploads the synthetic latency report as a temporary build artifact even if the test fails. Review the artifact alongside the exact head SHA and status before interpreting these results.
 
 **Still mandatory:** two distinct full browser sessions across tenants, real infrastructure replicas, metrics under representative user load, a measured encrypted restore, manual HR/privacy/security/operations sign-off, and a documented incident response exercise. Do not change production NO-GO or mark the entire M2.10 milestone accepted based on these CI checks.
+
+### M2.10.2 — two independent HTTP identities and ten-way proof contention
+
+- `backend/scripts/test-m2-cross-tenant-http.sh` provisions a second synthetic tenant and a distinct MFA-assured employee bearer token in disposable CI PostgreSQL. The API must show each employee their own profile and registered devices while rejecting tenant A administrators/employees attempting to inspect or revoke tenant B device records, even with the exact foreign device UUID. It also confirms the second employee cannot access tenant A's administrative timekeeping APIs.
+- `backend/scripts/test-device-security.sh` additionally sends **ten concurrent identical nonce attestation requests**. Exactly one HTTP 200 is permitted, and the other nine must be 403 or 409. This certifies one narrow anti-replay invariant, **not** device presence, time-clock accuracy, or distributed-system performance.
+- The existing CI identity and RLS coverage plus the synthetic 100-request, 10-worker HTTP report are checked on the same branch head. They do **not** establish production-equivalent multiple application replicas or legal readiness.
