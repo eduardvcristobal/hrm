@@ -3,7 +3,7 @@
 # A synthetic MFA-verified test token is inserted ONLY in disposable CI DB.
 : "${BASE:?}" "${BEARER:?}" "${COMPANY_ID:?}" "${EMP_ID:?}" "${DB_PASSWORD:?}"
 ES_BASE="$BASE/api/v1/employee-self-service"
-EMP_TOKEN="ci-m29-employee-$(python3 -c 'import uuid;print(uuid.uuid4())')"
+EMP_TOKEN="$(openssl rand -hex 32)"
 EMP_HASH="$(printf '%s' "$EMP_TOKEN" | sha256sum | cut -d' ' -f1)"
 PGPASSWORD="$DB_PASSWORD" psql -X -v ON_ERROR_STOP=1 -h localhost -p 5433 -U "${DB_USERNAME:-hrm_app}" -d hrm_dev -v token_hash="$EMP_HASH" <<'SQL'
 INSERT INTO auth_identity(tenant_id,email,password_hash,enabled)
