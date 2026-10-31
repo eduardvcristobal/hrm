@@ -34,12 +34,13 @@ public class EmployeeSelfServiceController {
                            LocalDate effectiveUntil,int weekdaysMask){}
     public record Leave(UUID id,UUID leaveTypeId,LocalDate startsOn,LocalDate endsOn,String status){}
     public record Attendance(UUID id,java.time.Instant clockInAt,java.time.Instant clockOutAt){}
+    public record LeaveCategory(UUID id,String code,String name){}
     public record NewLeaveRequest(@NotNull UUID leaveTypeId,@NotNull LocalDate from,
                                   @NotNull LocalDate to,
                                   @NotBlank @Size(min=8,max=500) String reason) {}
 
     public record Summary(Profile employee,List<Schedule> schedules,List<Leave> leaveRequests,
-                          List<Attendance> attendanceSessions,
+                          List<Attendance> attendanceSessions,List<LeaveCategory> availableLeaveCategories,
                           boolean clockInEnabled,boolean locationCaptureEnabled,
                           boolean biometricCaptureEnabled,String classification){}
 
@@ -214,8 +215,15 @@ public class EmployeeSelfServiceController {
                     rs.getTimestamp("clock_out_at")==null?null:
                       rs.getTimestamp("clock_out_at").toInstant()),
                 actor.tenantId(),employeeId);
-            return new Summary(profile.get(0),schedules,leaves,attendance,
-                false,false,false,"READ_ONLY_VERIFIED_EMPLOYEE_NO_DEVICE_CAPTURE");
+            List<LeaveCategory> categories=jdbc.query("""
+                SELECT id,code,name FROM time_leave_type
+                WHERE tenant_id=? AND company_id=? AND active=true
+                ORDER BY code LIMIT 100
+                """,(rs,n)->new LeaveCategory(rs.getObject("id",UUID.class),
+                    rs.getString("code"),rs.getString("name")),
+                actor.tenantId(),profile.get(0).companyId());
+            return new Summary(profile.get(0),schedules,leaves,attendance,categories,
+                false,false,false,"VERIFIED_EMPLOYEE_NO_DEVICE_CAPTURE");
         });
     }
     private void audit(HrmUserPrincipal actor,String action,String entity,UUID id){
