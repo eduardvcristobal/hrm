@@ -31,6 +31,22 @@ REPLAY="$(curl -sS -H "Authorization: Bearer $EMP_TOKEN" -H "X-Device-Credential
 OLD_NONCE="$(python3 -c 'import uuid;print(uuid.uuid4())')"
 STALE="$(curl -sS -H "Authorization: Bearer $EMP_TOKEN" -H "X-Device-Credential: $DEVICE_SECRET" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$(printf '{"nonce":"%s","timestamp":"2020-01-01T00:00:00Z"}' "$OLD_NONCE")" "$DEV_ROOT/devices/$DEVICE_ID/attest")"
 { test "$STALE" = 403 || test "$STALE" = 409; } || { echo "Stale device proof accepted: $STALE"; exit 1; }
+# Device credentials cannot replace the account bearer/MFA.
+CREDENTIAL_ONLY="$(curl -sS -H "X-Device-Credential: $DEVICE_SECRET" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$ATTEST_BODY" "$DEV_ROOT/devices/$DEVICE_ID/attest")"
+{ test "$CREDENTIAL_ONLY" = 401 || test "$CREDENTIAL_ONLY" = 403; } || { echo "Device credential bypassed account MFA: $CREDENTIAL_ONLY"; exit 1; }
+ADMIN_ATTEST="$(curl -sS -H "Authorization: Bearer $BEARER" -H "X-Device-Credential: $DEVICE_SECRET" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$ATTEST_BODY" "$DEV_ROOT/devices/$DEVICE_ID/attest")"
+test "$ADMIN_ATTEST" = 403 || { echo "Administrator impersonated employee device: $ADMIN_ATTEST"; exit 1; }
+# Race two independent requests against one nonce. Row locking and
+# database uniqueness must permit exactly one success.
+RACE_NONCE="$(python3 -c 'import uuid;print(uuid.uuid4())')"
+RACE_BODY="$(printf '{"nonce":"%s","timestamp":"%s"}' "$RACE_NONCE" "$CURRENT_TIME")"
+curl -sS -H "Authorization: Bearer $EMP_TOKEN" -H "X-Device-Credential: $DEVICE_SECRET" -o /tmp/hrm-device-race1.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$RACE_BODY" "$DEV_ROOT/devices/$DEVICE_ID/attest" > /tmp/hrm-device-race1.status &
+RACE_PID1=$!
+curl -sS -H "Authorization: Bearer $EMP_TOKEN" -H "X-Device-Credential: $DEVICE_SECRET" -o /tmp/hrm-device-race2.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$RACE_BODY" "$DEV_ROOT/devices/$DEVICE_ID/attest" > /tmp/hrm-device-race2.status &
+RACE_PID2=$!
+wait "$RACE_PID1"
+wait "$RACE_PID2"
+python3 -c 'a=[open("/tmp/hrm-device-race1.status").read(),open("/tmp/hrm-device-race2.status").read()];assert sorted(a)==["200","409"],a'
 REVOKED="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-device-revoked.json -w '%{http_code}' -X POST "$DEV_ROOT/admin/devices/$DEVICE_ID/revoke")"
 test "$REVOKED" = 200 || { echo "Admin device revoke failed: $REVOKED"; exit 1; }
 AFTER="$(curl -sS -H "Authorization: Bearer $EMP_TOKEN" -H "X-Device-Credential: $DEVICE_SECRET" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$(printf '{"nonce":"%s","timestamp":"%s"}' "$OLD_NONCE" "$CURRENT_TIME")" "$DEV_ROOT/devices/$DEVICE_ID/attest")"
