@@ -74,6 +74,79 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  replica-certification:
+    name: M2.10 dual-JVM shared-Postgres load and replay
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: hrm_dev
+          POSTGRES_USER: hrm_app
+          POSTGRES_PASSWORD: ci_only_password
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U hrm_app -d hrm_dev"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DB_URL: jdbc:postgresql://localhost:5433/hrm_dev
+      DB_USERNAME: hrm_app
+      DB_PASSWORD: ci_only_password
+      HRM_MFA_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      HRM_PERSONNEL_PII_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      HRM_DOCUMENT_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Package dedicated replica test build
+        run: mvn -B -DskipTests package
+      - name: Start two independent JVMs and certify shared-db consistency
+        shell: bash
+        run: |
+          set -euo pipefail
+          JAR="$(find target -maxdepth 1 -name 'hrm-saas-*.jar' ! -name '*.original' | head -1)"
+          test -f "$JAR"
+          java -jar "$JAR" --server.port=8081 > /tmp/m210-replica-a.log 2>&1 &
+          A_PID=$!
+          B_PID=""
+          trap 'kill "$A_PID" ${B_PID:-} 2>/dev/null || true' EXIT
+          for i in {1..90}; do
+            if curl -fsS http://localhost:8081/actuator/health >/dev/null; then break; fi
+            if ! kill -0 "$A_PID" 2>/dev/null; then echo 'Replica A terminated'; exit 1; fi
+            sleep 2
+          done
+          curl -fsS http://localhost:8081/actuator/health >/dev/null
+          java -jar "$JAR" --server.port=8082 > /tmp/m210-replica-b.log 2>&1 &
+          B_PID=$!
+          for i in {1..90}; do
+            if curl -fsS http://localhost:8082/actuator/health >/dev/null; then break; fi
+            if ! kill -0 "$B_PID" 2>/dev/null; then echo 'Replica B terminated'; exit 1; fi
+            sleep 2
+          done
+          curl -fsS http://localhost:8082/actuator/health >/dev/null
+          source scripts/test-m2-replica-fixtures.sh
+          python3 scripts/test-m2-replica-load.py
+      - name: Upload dual-replica test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m210-dual-jvm-evidence
+          path: |
+            /tmp/hrm-m210-replicas.json
+            /tmp/m210-replica-a.log
+            /tmp/m210-replica-b.log
+          if-no-files-found: warn
+          retention-days: 14
+
   personnel-frontend:
     name: Personnel frontend build
     runs-on: ubuntu-latest
