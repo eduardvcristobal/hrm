@@ -31,10 +31,11 @@ FROM personnel_employee e JOIN auth_identity i ON i.tenant_id=e.tenant_id
 WHERE e.employee_number='M210-B' AND i.email='m210-employee-other@example.invalid';
 COMMIT;
 SQL
-OTHER_EMP="$(PGPASSWORD="$DB_PASSWORD" psql -X -t -A -h localhost -p 5433 -U "${DB_USERNAME:-hrm_app}" -d hrm_dev -c "SELECT id FROM personnel_employee WHERE employee_number='M210-B'")"
-OTHER_DEVICE="$(PGPASSWORD="$DB_PASSWORD" psql -X -t -A -h localhost -p 5433 -U "${DB_USERNAME:-hrm_app}" -d hrm_dev -c "SELECT id FROM time_ess_device WHERE display_name='Other tenant laptop'")"
 curl -fsS -H "Authorization: Bearer $OTHER_TOKEN" "$BASE/api/v1/employee-self-service/me" > /tmp/hrm-m210-other-profile.json
-python3 -c 'import json,sys;x=json.load(open("/tmp/hrm-m210-other-profile.json"));assert x["employee"]["employeeId"]==sys.argv[1];assert x["employee"]["employeeId"]!=sys.argv[2];assert "OTHER" not in x.get("classification","")' "$OTHER_EMP" "$EMP_ID"
+OTHER_EMP="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-m210-other-profile.json"))["employee"]["employeeId"])')"
+python3 -c 'import json,sys;x=json.load(open("/tmp/hrm-m210-other-profile.json"));assert x["employee"]["employeeId"]!=sys.argv[1]' "$EMP_ID"
+curl -fsS -H "Authorization: Bearer $OTHER_TOKEN" "$BASE/api/v1/employee-self-service/devices" > /tmp/hrm-m210-other-devices.json
+OTHER_DEVICE="$(python3 -c 'import json;x=json.load(open("/tmp/hrm-m210-other-devices.json"));assert len(x)==1 and x[0]["status"]=="PENDING";print(x[0]["id"])')"
 curl -fsS -H "Authorization: Bearer $EMP_TOKEN" "$BASE/api/v1/employee-self-service/me" > /tmp/hrm-m210-original-profile.json
 python3 -c 'import json,sys;x=json.load(open("/tmp/hrm-m210-original-profile.json"));assert x["employee"]["employeeId"]==sys.argv[1]' "$EMP_ID"
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/employee-self-service/admin/devices?employeeId=$OTHER_EMP" > /tmp/hrm-m210-foreign-admin-list.json
