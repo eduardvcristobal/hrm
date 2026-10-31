@@ -39,3 +39,6 @@ python3 -c 'import json; x=json.load(open("/tmp/hrm-m2-leave-rejected.json"));as
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/audit-logs?limit=500" > /tmp/hrm-m2-leave-audit.json
 python3 -c 'import json,sys; rows=json.load(open("/tmp/hrm-m2-leave-audit.json")); targets=[(sys.argv[1],{"TIME_LEAVE_REQUESTED","TIME_LEAVE_APPROVED"}),(sys.argv[2],{"TIME_LEAVE_REQUESTED","TIME_LEAVE_REJECTED"})]; assert all(expected.issubset({r["action"] for r in rows if r["entityType"]=="time_leave_request" and r["entityId"]==ident}) for ident,expected in targets)' "$LEAVE_ID" "$LEAVE_REJECT_ID"
 echo "M2.5 leave type, independent approval/rejection, overlap, replay, cancellation and audit HTTP regression passed"
+
+# Continue with M2.5.1 policy and accrual coverage after leave fixtures exist.
+source scripts/test-leave-credits.sh
