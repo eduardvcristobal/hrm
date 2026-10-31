@@ -5,6 +5,9 @@ import './timekeeping.css';
 const TOKEN_KEY='apexHrm.accessToken';
 type LeaveType={id:string;companyId:string;code:string;name:string;active:boolean};
 type CreditBalance={employeeId:string;leaveTypeId:string;accruedCreditDays:number;spendable:boolean;classification:string};
+type JournalBalance={leaveTypeId:string;accruedDays:number;consumedDays:number;remainingDays:number;payable:boolean;policyCertified:boolean;classification:string};
+type JournalEvent={id:string;leaveRequestId:string;leaveTypeId:string;eventType:string;days:number;reversesEventId:string|null};
+type CarryoverPreview={proposedCarryoverDays:number;policyCap:number;posted:boolean;classification:string};
 type LeavePolicy={id:string;leaveTypeId:string;monthlyCreditDays:number;effectiveFrom:string;active:boolean};
 type LeaveRequest={id:string;employeeId:string;leaveTypeId:string;from:string;to:string;status:string;requestedBy:string;reviewedBy:string|null};
 async function api<T>(path:string,options:RequestInit={}):Promise<T>{
@@ -39,6 +42,14 @@ export default function LeaveManagementPage(){
   const [monthlyDays,setMonthlyDays]=useState('1.250');
   const [policyEffective,setPolicyEffective]=useState('2026-01-01');
   const [creditMonth,setCreditMonth]=useState('2026-10');
+  const [balances,setBalances]=useState<JournalBalance[]>([]);
+  const [journal,setJournal]=useState<JournalEvent[]>([]);
+  const [debitRequest,setDebitRequest]=useState('');
+  const [debitDays,setDebitDays]=useState('1.000');
+  const [debitNote,setDebitNote]=useState('Reviewed chargeable leave days');
+  const [carryYear,setCarryYear]=useState(String(new Date().getUTCFullYear()+1));
+  const [carryCap,setCarryCap]=useState('1.000');
+  const [carryPreview,setCarryPreview]=useState<CarryoverPreview|null>(null);
   async function run(task:()=>Promise<void>){
     setBusy(true);setError('');setNotice('');
     try{await task();}catch(e){setError(e instanceof Error?e.message:'Leave management request failed');}
@@ -77,6 +88,50 @@ export default function LeaveManagementPage(){
       await refreshCredits();setNotice('Monthly informational credit posted once and audited.');
     });
   }
+  async function refreshBalances(){
+    if(!employeeId)throw new Error('Enter the employee UUID.');
+    setBalances(await api<JournalBalance[]>(`/employees/${encodeURIComponent(employeeId)}/leave-balances`));
+  }
+  async function refreshJournal(){
+    if(!employeeId||!leaveTypeId)throw new Error('Select an employee and leave category.');
+    setJournal(await api<JournalEvent[]>(`/employees/${encodeURIComponent(employeeId)}/leave-balances/events?leaveTypeId=${encodeURIComponent(leaveTypeId)}`));
+  }
+  function debitLeave(event:FormEvent){
+    event.preventDefault();
+    if(!window.confirm('Record this explicitly reviewed debit? It does not certify paid leave, holidays or legal entitlements.'))return;
+    void run(async()=>{
+      await api(`/employees/${encodeURIComponent(employeeId)}/leave-balances/requests/${encodeURIComponent(debitRequest)}/consume`,{method:'POST',body:JSON.stringify({days:Number(debitDays),note:debitNote})});
+      await Promise.all([refreshBalances(),refreshJournal()]);
+      setNotice('Manual leave debit recorded and audited. No payroll changes made.');
+    });
+  }
+  function reverseDebit(eventId:string){
+    const note=window.prompt('Reason for reversing this debit (at least eight characters):');
+    if(!note)return;
+    if(!window.confirm('Post a compensating reversal? The original debit will remain in audit history.'))return;
+    void run(async()=>{
+      await api(`/employees/${encodeURIComponent(employeeId)}/leave-balances/events/${encodeURIComponent(eventId)}/reverse`,{method:'POST',body:JSON.stringify({note})});
+      await Promise.all([refreshBalances(),refreshJournal()]);
+      setNotice('Compensating reversal recorded and audited.');
+    });
+  }
+  function configureCarryover(event:FormEvent){
+    event.preventDefault();
+    if(!window.confirm('Save a non-posting carryover preview cap? This does not award leave.'))return;
+    void run(async()=>{
+      await api('/leave-carryover-preview-policies',{method:'POST',body:JSON.stringify({
+        leaveTypeId,destinationYear:Number(carryYear),maximumDays:Number(carryCap)
+      })});
+      setNotice('Preview-only carryover cap configured. No leave transferred.');
+    });
+  }
+  function showCarryover(){
+    void run(async()=>{
+      const params=new URLSearchParams({leaveTypeId,destinationYear:carryYear});
+      setCarryPreview(await api<CarryoverPreview>(`/employees/${encodeURIComponent(employeeId)}/leave-carryover-preview?${params}`));
+      setNotice('Carryover preview calculated without posting any credit.');
+    });
+  }
   function createType(event:FormEvent){
     event.preventDefault();
     void run(async()=>{
@@ -109,7 +164,7 @@ export default function LeaveManagementPage(){
   }
   return <main className="timekeeping-root">
     <header className="timekeeping-top"><div><p className="timekeeping-eyebrow">Apex People / M2.5</p><h1>Leave Management</h1><p>Leave categories, employee requests and independent approval.</p></div><div><Link to="/timekeeping">Timekeeping</Link> &nbsp; <Link to="/dashboard">Dashboard</Link></div></header>
-    <div className="timekeeping-hint">M2.5 foundation: MFA-verified tenant administrators only. Informational monthly credit rules and accruals are available. Spendable entitlements, leave debit, statutory leave and payroll effects remain unimplemented. Do not use with real employee data before acceptance.</div>
+    <div className="timekeeping-hint">M2.5 foundation: MFA-verified tenant administrators only. Informational monthly credit rules and accruals are available. Manual approved-leave debit and compensating reversal are available. Spendable legal entitlements, working-day attribution and payroll effects remain unimplemented. Do not use with real employee data before acceptance.</div>
     {error&&<p className="timekeeping-alert" role="alert">{error}</p>}
     {notice&&<p className="timekeeping-alert" role="status">{notice}</p>}
     <section className="timekeeping-card"><h2>Workspace context</h2><div className="timekeeping-grid"><label>Company UUID<input aria-label="Company UUID" value={companyId} onChange={e=>setCompanyId(e.target.value)} placeholder="Company ID"/></label><label>Employee UUID<input aria-label="Employee UUID" value={employeeId} onChange={e=>setEmployeeId(e.target.value)} placeholder="Employee ID"/></label></div><div className="timekeeping-actions"><button type="button" disabled={busy||!companyId} onClick={()=>void run(refreshTypes)}>Load leave types</button><button type="button" disabled={busy||!employeeId} onClick={()=>void run(refreshRequests)}>Load employee requests</button></div></section>
@@ -133,6 +188,14 @@ export default function LeaveManagementPage(){
       <h3>Employee accrued credits (not spendable)</h3>
       {credits.length===0?<p>No credit records loaded.</p>:<ul>{credits.map(c=><li key={c.leaveTypeId}><strong>{types.find(t=>t.id===c.leaveTypeId)?.name||c.leaveTypeId}</strong>: {c.accruedCreditDays} credited days — not spendable</li>)}</ul>}
     </section>
+    <section className="timekeeping-card"><h2>Manual leave reconciliation (M2.5.2)</h2>
+      <p>Only approved leave requests may be debited against informational credits. The administrator must separately confirm actual chargeable days. This is not statutory, payable, or payroll-certified.</p>
+      <div className="timekeeping-actions"><button type="button" disabled={busy||!employeeId} onClick={()=>void run(refreshBalances)}>Refresh reconciled balances</button><button type="button" disabled={busy||!employeeId||!leaveTypeId} onClick={()=>void run(refreshJournal)}>Load debit and reversal journal</button></div>
+      <ul>{balances.map(b=><li key={b.leaveTypeId}><strong>{types.find(t=>t.id===b.leaveTypeId)?.name||b.leaveTypeId}</strong> — {b.accruedDays} credited, {b.consumedDays} consumed, <strong>{b.remainingDays} remaining (not payable)</strong></li>)}</ul>
+      <form onSubmit={debitLeave}><div className="timekeeping-grid"><label>Approved leave request<select aria-label="Approved leave request" required value={debitRequest} onChange={e=>setDebitRequest(e.target.value)}><option value="">Select an approved request</option>{requests.filter(r=>r.status==='APPROVED' && r.leaveTypeId===leaveTypeId).map(r=><option key={r.id} value={r.id}>{r.from} to {r.to} — {r.id.slice(0,8)}</option>)}</select></label><label>HR-confirmed debit days<input aria-label="HR-confirmed debit days" required type="number" step="0.001" min="0.001" max="366" value={debitDays} onChange={e=>setDebitDays(e.target.value)}/></label></div><label>Reconciliation reason<input aria-label="Reconciliation reason" required minLength={8} maxLength={500} value={debitNote} onChange={e=>setDebitNote(e.target.value)}/></label><button disabled={busy||!employeeId||!debitRequest}>Post reviewed debit</button></form>
+      <h3>Immutable journal</h3>{journal.length===0?<p>No journal events loaded for selected category.</p>:<ul>{journal.map(e=><li key={e.id}>{e.eventType} {e.days} days — request {e.leaveRequestId.slice(0,8)} {e.eventType==='DEBIT'&&!journal.some(r=>r.reversesEventId===e.id)?<button type="button" disabled={busy} onClick={()=>reverseDebit(e.id)}>Reverse debit</button>:null}</li>)}</ul>}
+    </section>
+    <section className="timekeeping-card"><h2>Carryover planning (preview only)</h2><p>The cap applies to a snapshot of unsettled informational credits. It does not award, transfer, or expire leave.</p><form onSubmit={configureCarryover}><div className="timekeeping-grid"><label>Destination year<input aria-label="Carryover destination year" type="number" min={new Date().getUTCFullYear()+1} max="2200" required value={carryYear} onChange={e=>setCarryYear(e.target.value)}/></label><label>Maximum preview days<input aria-label="Maximum carryover days" type="number" step="0.001" min="0" max="366" required value={carryCap} onChange={e=>setCarryCap(e.target.value)}/></label></div><div className="timekeeping-actions"><button type="submit" disabled={busy||!leaveTypeId}>Save preview policy</button><button type="button" disabled={busy||!leaveTypeId||!employeeId} onClick={showCarryover}>Preview carryover</button></div></form>{carryPreview&&<p role="status">Proposed only: {carryPreview.proposedCarryoverDays} days (cap: {carryPreview.policyCap}). Posted: no. No legal or payroll entitlement created.</p>}</section>
     <section className="timekeeping-card"><h2>Employee leave requests</h2>{requests.length===0?<p>No requests loaded.</p>:<div style={{overflowX:'auto'}}><table style={{width:'100%',borderSpacing:12,textAlign:'left'}}><thead><tr><th>Period</th><th>Category</th><th>Status</th><th>Requested by</th><th>Review actions</th></tr></thead><tbody>{requests.map(r=><tr key={r.id}><td>{r.from} to {r.to}</td><td>{types.find(t=>t.id===r.leaveTypeId)?.name||r.leaveTypeId}</td><td>{r.status}</td><td>{r.requestedBy.slice(0,8)}…</td><td>{r.status==='PENDING'?<div className="timekeeping-actions"><button disabled={busy} onClick={()=>review(r.id,'APPROVED')}>Approve</button><button disabled={busy} onClick={()=>review(r.id,'REJECTED')}>Reject</button><button disabled={busy} onClick={()=>cancel(r.id)}>Cancel</button></div>:'Reviewed / closed'}</td></tr>)}</tbody></table></div>}</section>
   </main>;
 }
