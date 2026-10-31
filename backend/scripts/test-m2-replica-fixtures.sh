@@ -42,9 +42,15 @@ FROM personnel_employee e
  JOIN auth_identity i ON i.tenant_id=e.tenant_id
  JOIN auth_identity admin ON admin.tenant_id=e.tenant_id AND admin.email='m210-replica-admin@example.invalid'
 WHERE e.employee_number='M210-REPLICA' AND i.email='m210-replica-employee@example.invalid';
+\o /tmp/hrm-m210-employee-id
+SELECT id FROM personnel_employee WHERE employee_number='M210-REPLICA';
+\o
+\o /tmp/hrm-m210-device-id
+SELECT id FROM time_ess_device WHERE display_name='CI two-process enrolled device';
+\o
 COMMIT;
 SQL
-export M210_EMP_ID="$(PGPASSWORD="$DB_PASSWORD" psql -X -t -A -h localhost -p 5433 -U "$DB_USERNAME" -d hrm_dev -c "SELECT id FROM personnel_employee WHERE employee_number='M210-REPLICA'")"
-export M210_DEVICE_ID="$(PGPASSWORD="$DB_PASSWORD" psql -X -t -A -h localhost -p 5433 -U "$DB_USERNAME" -d hrm_dev -c "SELECT id FROM time_ess_device WHERE display_name='CI two-process enrolled device'")"
+export M210_EMP_ID="$(tr -d '[:space:]' < /tmp/hrm-m210-employee-id)"
+export M210_DEVICE_ID="$(tr -d '[:space:]' < /tmp/hrm-m210-device-id)"
 test -n "$M210_EMP_ID" && test -n "$M210_DEVICE_ID"
 echo 'M2.10 synthetic two-process fixtures created (secrets not printed)'
