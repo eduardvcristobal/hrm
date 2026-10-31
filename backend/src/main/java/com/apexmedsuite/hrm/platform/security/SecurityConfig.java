@@ -57,6 +57,24 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/admin/invitations", "/api/v1/admin/invitations/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
                 .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
                 .requestMatchers("/api/v1/companies", "/api/v1/companies/**").hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
+                // M2.9 ESS: distinct narrow surface before the tenant-admin-only timekeeping matcher.
+                .requestMatchers("/api/v1/employee-self-service/admin/**")
+                    .hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
+                .requestMatchers(HttpMethod.GET, "/api/v1/employee-self-service/me")
+                    .hasAllAuthorities("ROLE_EMPLOYEE","ROLE_MFA_VERIFIED")
+                .requestMatchers(HttpMethod.POST, "/api/v1/employee-self-service/leave-requests")
+                    .hasAllAuthorities("ROLE_EMPLOYEE","ROLE_MFA_VERIFIED")
+                .requestMatchers(HttpMethod.GET, "/api/v1/employee-self-service/devices")
+                    .hasAllAuthorities("ROLE_EMPLOYEE","ROLE_MFA_VERIFIED")
+                .requestMatchers(HttpMethod.POST, "/api/v1/employee-self-service/devices")
+                    .hasAllAuthorities("ROLE_EMPLOYEE","ROLE_MFA_VERIFIED")
+                .requestMatchers(HttpMethod.POST, "/api/v1/employee-self-service/devices/*/activate",
+                    "/api/v1/employee-self-service/devices/*/attest",
+                    "/api/v1/employee-self-service/devices/*/revoke")
+                    .hasAllAuthorities("ROLE_EMPLOYEE","ROLE_MFA_VERIFIED")
+                .requestMatchers("/api/v1/employee-self-service/**").denyAll()
+                .requestMatchers("/api/v1/timekeeping/**")
+                    .hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
                 .requestMatchers("/api/v1/personnel/employees/*/hr-cases", "/api/v1/personnel/employees/*/hr-cases/**",
                     "/api/v1/personnel/employees/*/documents", "/api/v1/personnel/employees/*/documents/**")
                     .hasAllAuthorities("ROLE_TENANT_ADMIN","ROLE_MFA_VERIFIED")
