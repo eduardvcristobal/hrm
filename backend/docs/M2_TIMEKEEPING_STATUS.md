@@ -25,3 +25,10 @@ Latest verified M2.4 regression: GitHub Actions workflows on commit 6dcf710d bot
 - M2.10 comprehensive E2E, performance, security, multi-tenant and human acceptance.
 
 Do not merge PR automatically. Production remains NO-GO, with no real employee data allowed before acceptance.
+## M2.5.1 leave credit milestone — pending integrated acceptance
+- V40 introduces tenant-RLS policy history and once-only employee/month/type credit postings. Database constraints enforce numeric 0–31 days, first-of-month periods and uniqueness.
+- API: `POST /api/v1/timekeeping/leave-credit-policies` with {leaveTypeId,monthlyCreditDays,effectiveFrom}; `GET /leave-credit-policies?leaveTypeId=...`; `POST /employees/{employeeId}/leave-credits/accrue?leaveTypeId=...&month=YYYY-MM`; `GET /employees/{employeeId}/leave-credits?leaveTypeId=...`; `GET /employees/{employeeId}/leave-credit-balances` under the `/api/v1/timekeeping` prefix.
+- Employee row locking and uniqueness reject double postings, and posting a future month or pre-hire month is blocked. Posted entries are immutable through the public API and audited.
+- The balance is **informational accrued credits**, not available-to-take days. There is no balance subtraction for approved leave, no proration, eligibility, carryover, expiration, policy-version retroactivity, year-end close or backdated employment replay.
+- This is not a representation of Philippine statutory leave entitlement and must not affect employee wages, legal leave or payroll until reviewed by HR/legal and tested.
+- PostgreSQL live HTTP regression covers policy create, duplicate denial, future rejection, single posting, audit and read-only credit aggregation. New CI verification is required before marking this increment accepted.
