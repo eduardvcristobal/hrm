@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import './timekeeping.css';
+import EmployeeDevicesPanel from './EmployeeDevicesPanel';
 
 type Profile={employeeId:string;companyId:string;employeeNumber:string;firstName:string;lastName:string;employmentStatus:string};
 type Schedule={id:string;shiftId:string;effectiveFrom:string;effectiveUntil:string|null;weekdaysMask:number};
@@ -73,6 +74,7 @@ export default function EmployeeSelfServicePage(){
       </div>
       <button type="button" disabled={busy||!leaveType||!from||!to||reason.trim().length<8} onClick={()=>void submitLeave()}>Submit my leave request</button>
     </section>}
+    {data&&<EmployeeDevicesPanel/>}
     {data&&<section className="timekeeping-card"><h2>My recent attendance (raw, not payable)</h2>
       {data.attendanceSessions.length===0?<p>No attendance sessions recorded.</p>:<div style={{overflowX:'auto'}}><table style={{width:'100%',borderSpacing:12,textAlign:'left'}}><thead><tr><th>Clock in (UTC)</th><th>Clock out (UTC)</th><th>Status</th></tr></thead><tbody>
         {data.attendanceSessions.map(a=><tr key={a.id}><td>{a.clockInAt}</td><td>{a.clockOutAt||'—'}</td><td>{a.clockOutAt?'Closed':'Open'}</td></tr>)}
