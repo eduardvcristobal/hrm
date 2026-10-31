@@ -37,6 +37,12 @@ ADMIN_PATH="$(curl -sS -H "Authorization: Bearer $EMP_TOKEN" -o /dev/null -w '%{
 test "$ADMIN_PATH" = 403 || { echo "Employee bypassed tenant-admin timekeeping: $ADMIN_PATH"; exit 1; }
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/audit-logs?limit=500" > /tmp/hrm-m29-audit.json
 python3 -c 'import json,sys;a=json.load(open("/tmp/hrm-m29-audit.json"));assert any(x["entityId"]==sys.argv[1] and x["action"]=="TIME_ESS_IDENTITY_LINKED" for x in a)' "$LINK_ID"
+# Verify employee-only leave creation before link revocation.
+NEW_LEAVE_STATUS="$(curl -sS -H "Authorization: Bearer $EMP_TOKEN" -o /tmp/hrm-m29-newleave.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$(printf '{"leaveTypeId":"%s","from":"2026-12-01","to":"2026-12-02","reason":"Employee-submitted time off request"}' "$LEAVE_TYPE_ID")" "$ES_BASE/leave-requests")"
+test "$NEW_LEAVE_STATUS" = 201 || { echo "Employee leave creation failed: $NEW_LEAVE_STATUS"; cat /tmp/hrm-m29-newleave.json; exit 1; }
+SELF_LEAVE_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-m29-newleave.json"))["id"])')"
+APPROVAL_STATUS="$(curl -sS -H "Authorization: Bearer $SECOND_BEARER" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/timekeeping/employees/$EMP_ID/leave-requests/$SELF_LEAVE_ID/decision?decision=APPROVED")"
+test "$APPROVAL_STATUS" = 200 || { echo "Independent HR review failed: $APPROVAL_STATUS"; exit 1; }
 # Revoking the link must instantly deny the same still-valid employee bearer token.
 REVOKE_STATUS="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-m29-revoked.json -w '%{http_code}' -X POST "$ES_BASE/admin/identity-links/$LINK_ID/revoke")"
 test "$REVOKE_STATUS" = 200 || { echo "Link revocation failed: $REVOKE_STATUS"; cat /tmp/hrm-m29-revoked.json; exit 1; }
