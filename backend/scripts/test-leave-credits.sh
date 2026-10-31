@@ -25,3 +25,6 @@ python3 -c 'import json,sys; a=json.load(open("/tmp/hrm-credit-balances.json"));
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/audit-logs?limit=500" > /tmp/hrm-credit-audit.json
 python3 -c 'import json,sys; a=json.load(open("/tmp/hrm-credit-audit.json"));assert any(x["entityId"]==sys.argv[1] and x["action"]=="TIME_LEAVE_CREDIT_POSTED" for x in a)' "$CREDIT_ID"
 echo "M2.5.1 leave policy and once-only monthly credit ledger HTTP regression passed"
+
+# Verify explicit approved-leave debits and compensating reversals.
+source scripts/test-leave-balance.sh
