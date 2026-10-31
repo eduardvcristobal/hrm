@@ -21,10 +21,11 @@ TOKEN = os.environ["M210_EMP_TOKEN"]
 SECRET = os.environ["M210_DEVICE_SECRET"]
 DEVICE = os.environ["M210_DEVICE_ID"]
 EMPLOYEE = os.environ["M210_EMP_ID"]
-COUNT = int(os.environ.get("M210_REPLICA_REQUESTS", "400"))
+COUNT = int(os.environ.get("M210_REPLICA_REQUESTS", "800"))
+PACE_MS = int(os.environ.get("M210_REPLICA_PACE_MS", "500"))
 WORKERS = int(os.environ.get("M210_REPLICA_WORKERS", "20"))
 MAX_P95 = float(os.environ.get("M210_REPLICA_P95_GUARD_MS", "5000"))
-if not (2 <= COUNT <= 2000 and 2 <= WORKERS <= 40):
+if not (2 <= COUNT <= 2000 and 2 <= WORKERS <= 40 and 0 <= PACE_MS <= 2000):
     raise ValueError("Synthetic CI limits: 2..2000 requests, 2..40 workers")
 if len(set(HOSTS)) != 2:
     raise ValueError("Replicas must have different URLs")
@@ -51,6 +52,8 @@ def call(url, method="GET", payload=None, device_secret=None):
     return ((time.perf_counter()-start)*1000,code,data)
 
 def read(index):
+    # A bounded ~20-second CI traffic stream, not a production stress workload.
+    time.sleep(PACE_MS / 1000)
     host = HOSTS[index % 2]
     elapsed,code,body = call(host + "/api/v1/employee-self-service/me")
     valid = (code == 200 and isinstance(body,dict) and
@@ -99,7 +102,7 @@ passed=(all(x["valid"] for x in readings) and pct(95)<=MAX_P95 and
 report={
     "scope":"M2.10.3_TWO_LOCAL_PROCESSES_SHARED_POSTGRES_NOT_PRODUCTION_CAPACITY",
     "infrastructure":"GitHub-hosted runner; two Spring Boot JVM processes; shared PostgreSQL 17 container",
-    "replicas":per_replica,"workers":WORKERS,"requests":COUNT,"elapsed_seconds":round(duration,2),
+    "replicas":per_replica,"workers":WORKERS,"requests":COUNT,"per_worker_pace_ms":PACE_MS,"elapsed_seconds":round(duration,2),
     "throughput_rps_observed":round(COUNT/duration,2),
     "latency_ms":{"mean":round(statistics.mean(lat),2),"p50":pct(50),"p95":pct(95),"p99":pct(99),"max":round(lat[-1],2)},
     "provisional_ci_p95_guard_ms":MAX_P95,"errors":sum(not x["valid"] for x in readings),
