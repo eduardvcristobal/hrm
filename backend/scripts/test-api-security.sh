@@ -122,6 +122,7 @@ source scripts/test-rehire-dual-control.sh
 source scripts/test-hr-workflows.sh
 source scripts/test-timekeeping.sh
 source scripts/test-leave-management.sh
+source scripts/test-employee-self-service.sh
 REVOKED="$(curl -sS -X DELETE -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/security/tokens/current")"
 test "$REVOKED" = 204 || { echo "Token revoke returned $REVOKED"; exit 1; }
 AFTER="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' "$BASE/api/v1/me")"
