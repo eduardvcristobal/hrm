@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import './timekeeping.css';
+import EmployeeDeviceAdminPanel from './EmployeeDeviceAdminPanel';
 
 type LinkRecord={id:string;employeeId:string;identityId:string};
 const tokenKey='apexHrm.accessToken';
@@ -57,5 +58,6 @@ export default function EmployeeIdentityAdminPage(){
       {links.length===0?<p>No active link loaded for this employee.</p>:<ul>{links.map(link=><li key={link.id}>Identity: <code>{link.identityId}</code> <button type="button" disabled={busy} onClick={()=>revoke(link.id)}>Revoke access</button></li>)}</ul>}
       <p>Revoked bindings remain preserved for audit and cannot be silently reused.</p>
     </section>
+    <EmployeeDeviceAdminPanel employeeId={employeeId}/>
   </main>;
 }
