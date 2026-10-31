@@ -33,3 +33,14 @@
 ## Current automation coverage interpretation
 
 The M2.9.1 device attestation is an **authentication proof only**, not a clock-in or hour record. The one-time device secret is delivered to an MFA-authenticated employee after a second-actor review. A separate secure device OS storage integration, theft recovery and cryptographic channel binding are still needed for production. A unique nonce prevents an identical device proof from being accepted twice, including simultaneous submissions; this alone does not prove a physical employee was present.
+
+## M2.10.1 — automated first-pass two-tenant security and HTTP latency gates
+
+The following checks execute against **ephemeral CI data**. They are a prerequisite for staging, not production clearance:
+
+- `backend/scripts/test-m2-tenant-boundaries.sql` creates separate tenant A/B employees, identity links, registered devices and nonce rows. A restricted `NOSUPERUSER NOBYPASSRLS` role checks that tenant A cannot see B's records, cannot update B's devices or identity links by known ID, and gets no results with no tenant context. All fixture writes are rolled back.
+- `backend/scripts/test-m2-load.py` sends **100 authenticated GET requests with 10 concurrent workers** to the self-service `/me` endpoint on real PostgreSQL. Every response must carry the expected employee's ID and all device capture flags disabled. The script emits `/tmp/hrm-m210-http-load.json` with response statuses, p50, p95 and p99 latency, and uses a generous **5,000 ms provisional CI guardrail**. This provisional limit is not an approved SLO or performance baseline.
+- `backend/scripts/test-device-security.sh` checks **10 simultaneous submissions of one valid nonce** to an enrolled, approved device. Exactly one attestation may succeed; all other results must be explicit 403/409 replay denials. It also checks missing MFA, invalid secrets, stale timestamps, one-time activation and credential revocation.
+- The backend GitHub Actions workflow uploads the synthetic latency report as a temporary build artifact even if the test fails. Review the artifact alongside the exact head SHA and status before interpreting these results.
+
+**Still mandatory:** two distinct full browser sessions across tenants, real infrastructure replicas, metrics under representative user load, a measured encrypted restore, manual HR/privacy/security/operations sign-off, and a documented incident response exercise. Do not change production NO-GO or mark the entire M2.10 milestone accepted based on these CI checks.
