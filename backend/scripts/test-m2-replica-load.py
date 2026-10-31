@@ -64,7 +64,7 @@ def read(index):
 for host in HOSTS:
     _,code,body = call(host + "/api/v1/employee-self-service/me")
     if code != 200 or body.get("employee",{}).get("employeeId") != EMPLOYEE:
-        raise SystemExit("Replica not ready or employee context invalid: " + host)
+        raise SystemExit("Replica identity preflight failed: " + host + " status=" + str(code) + " employee_matches=" + str(isinstance(body,dict) and body.get("employee",{}).get("employeeId")==EMPLOYEE))
 
 begin = time.monotonic()
 with concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS) as pool:
