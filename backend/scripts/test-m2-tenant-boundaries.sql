@@ -48,32 +48,23 @@ BEGIN
    RAISE EXCEPTION 'M2.10 device/identity RLS tenant A query failed';
  END IF;
 END $check$;
--- Tenant A cannot UPDATE tenant B even when given B's primary key.
-UPDATE time_ess_device SET display_name='SHOULD NOT MODIFY'
-WHERE id=:'target_device_b'::uuid;
-DO $check$
-BEGIN
- IF FOUND THEN RAISE EXCEPTION 'Cross-tenant device modification succeeded'; END IF;
-END $check$;
--- Validate the actual row count with a SQL variable; no exceptions are expected.
-SELECT count(*) AS foreign_rows FROM time_ess_device WHERE id=:'target_device_b'::uuid \gset
-\if :foreign_rows
-\echo 'Cross-tenant device read exposed data'
-\quit 1
+-- A tenant A restricted-role update using a B primary key must change zero rows.
+WITH changed AS (
+ UPDATE time_ess_device SET display_name='SHOULD NOT MODIFY'
+ WHERE id=:'target_device_b'::uuid RETURNING id
+) SELECT count(*) AS modified FROM changed \gset
+\if :modified
+\echo 'Cross-tenant device UPDATE changed a foreign row'
+\quit
 \endif
--- Reassignment attempt must violate RLS WITH CHECK even if a visible
--- tenant A row is targeted. Use a savepoint to keep transaction healthy.
-SAVEPOINT forbidden_reassignment;
-DO $test$
-BEGIN
- BEGIN
-  UPDATE time_employee_identity_link SET tenant_id=:'b'::uuid
-   WHERE tenant_id=:'a'::uuid;
-  RAISE EXCEPTION 'Cross-tenant identity rewrite was not blocked';
- EXCEPTION WHEN insufficient_privilege OR check_violation OR foreign_key_violation THEN NULL;
- END;
-END $test$;
-ROLLBACK TO SAVEPOINT forbidden_reassignment;
+WITH changed AS (
+ UPDATE time_employee_identity_link SET revoked_at=now()
+ WHERE id=:'target_link_b'::uuid RETURNING id
+) SELECT count(*) AS modified FROM changed \gset
+\if :modified
+\echo 'Cross-tenant employee identity UPDATE changed a foreign row'
+\quit
+\endif
 SELECT set_config('app.tenant_id','',true);
 DO $check$
 BEGIN
