@@ -6,7 +6,9 @@ test('leave management renders controlled administration workflow',async({page})
   await expect(page.getByRole('heading',{name:'Create leave category'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Submit leave request'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Employee leave requests'})).toBeVisible();
-  await expect(page.getByText('Entitlement balances, accrual, paid leave and payroll effects are not implemented')).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Monthly leave credits (M2.5.1 preview)'})).toBeVisible();
+  await expect(page.getByText('Employee accrued credits (not spendable)')).toBeVisible();
+  await expect(page.getByText('Spendable entitlements, leave debit, statutory leave and payroll effects remain unimplemented')).toBeVisible();
   await expect(page.getByRole('button',{name:'Create category'})).toBeDisabled();
   await expect(page.getByRole('button',{name:'Submit for review'})).toBeDisabled();
 });
