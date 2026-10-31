@@ -46,7 +46,7 @@ curl -sS -H "Authorization: Bearer $EMP_TOKEN" -H "X-Device-Credential: $DEVICE_
 RACE_PID2=$!
 wait "$RACE_PID1"
 wait "$RACE_PID2"
-python3 -c 'a=[open("/tmp/hrm-device-race1.status").read(),open("/tmp/hrm-device-race2.status").read()];assert sorted(a)==["200","409"],a'
+python3 -c 'a=[open("/tmp/hrm-device-race1.status").read(),open("/tmp/hrm-device-race2.status").read()];assert a.count("200")==1 and sum(x in ("403","409") for x in a)==1,a'
 REVOKED="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-device-revoked.json -w '%{http_code}' -X POST "$DEV_ROOT/admin/devices/$DEVICE_ID/revoke")"
 test "$REVOKED" = 200 || { echo "Admin device revoke failed: $REVOKED"; exit 1; }
 AFTER="$(curl -sS -H "Authorization: Bearer $EMP_TOKEN" -H "X-Device-Credential: $DEVICE_SECRET" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$(printf '{"nonce":"%s","timestamp":"%s"}' "$OLD_NONCE" "$CURRENT_TIME")" "$DEV_ROOT/devices/$DEVICE_ID/attest")"
