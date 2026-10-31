@@ -7,7 +7,7 @@
 - This development is **NO-GO** for payroll release, statutory compliance, real employee pay and production processing.
 
 ## M3.1 — Payroll configuration and draft pay-period foundation
-- V36 defines tenant/organization-constrained effective-dated payroll configuration and company-linked pay periods.
+- V70 defines tenant/organization-constrained effective-dated payroll configuration and company-linked pay periods.
 - Frequency choices are `SEMI_MONTHLY`, `MONTHLY`, `WEEKLY`, and `BIWEEKLY`. Currency code must use three uppercase letters; timezone must parse through `ZoneId`. No frequency infers dates automatically.
 - Periods are **DRAFT only**, enforced through a database `CHECK(status='DRAFT')`; overlapping date ranges are prohibited by PostgreSQL exclusion constraint, including concurrent creates. Pay dates and period ranges are bounded.
 - All tables have forced tenant RLS, tenant FK checks and explicit company matching for configuration/period combinations.
@@ -32,3 +32,10 @@
 - Strict tenant isolation, FORCED RLS and fail-closed MFA. No use of real payroll data in tests.
 - Human HR/payroll, finance, privacy, security, legal and operations approvals plus paid-hours/attendance source sign-off.
 - Production remains **NO-GO**; never merge automatically.
+
+## M3.2 delivered — component definitions only
+- `V71__payroll_component_catalogue.sql` declares tenant/organization-scoped, effective-dated immutable component metadata; `component_kind` is `EARNING` or `DEDUCTION`, `treatment` is always `UNREVIEWED`. No amounts, rates, formulas, deduction computations, employee assignments or statutory schedules are stored.
+- `POST/GET /api/v1/payroll/components` requires MFA-verified tenant administrator and records every creation in `audit_event`; duplicate versions, malformed codes, invalid categories and mutation requests are rejected.
+- `/payroll` includes the component catalogue and its immutable versions. Browser tests cover unauthenticated denial, DRAFT-only periods, and an unreviewed component.
+- `backend/scripts/test-payroll-rls.sql` and live HTTP tests exercise two-tenant forced RLS, access denial and payroll foundation constraints.
+- **Migration compatibility:** the payroll branch uses **V70 and V71**, rather than conflicting with the unmerged M2 branch's V36–V48. Future merges must still validate Flyway order/history on a fresh database and on databases already migrated to M2; this document does not certify those future merge paths.
