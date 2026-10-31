@@ -93,7 +93,7 @@ export default function TimekeepingPage(){
     });
   }
   return <main className="timekeeping-root">
-    <header className="timekeeping-top"><div><p className="timekeeping-eyebrow">Apex People / M2</p><h1>Timekeeping & Attendance</h1><p>Shift templates, employee schedules, and controlled attendance capture.</p></div><div><Link to="/leave">Leave management</Link> &nbsp; <Link to="/dashboard">Back to dashboard</Link></div></header>
+    <header className="timekeeping-top"><div><p className="timekeeping-eyebrow">Apex People / M2</p><h1>Timekeeping & Attendance</h1><p>Shift templates, employee schedules, and controlled attendance capture.</p></div><div><Link to="/leave">Leave management</Link> &nbsp; <Link to="/calendar">Holidays & rest days</Link> &nbsp; <Link to="/dashboard">Back to dashboard</Link></div></header>
     <div className="timekeeping-hint">MFA-verified tenant administrators only. Clock times come from the server. Employee punch devices and payroll calculations are not active.</div>
     {notice&&<p role="status" className="timekeeping-alert">{notice}</p>}
     <section className="timekeeping-card"><h2>Workspace context</h2><div className="timekeeping-grid">
