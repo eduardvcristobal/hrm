@@ -79,12 +79,43 @@ public class EmployeeSelfServiceController {
         });
     }
 
+    @GetMapping("/admin/identity-links")
+    public List<Link> links(@AuthenticationPrincipal HrmUserPrincipal actor,
+                            @RequestParam UUID employeeId){
+        return tenants.inTenant(actor.tenantId(),()->jdbc.query("""
+            SELECT id,employee_id,identity_id FROM time_employee_identity_link
+            WHERE tenant_id=? AND employee_id=? AND revoked_at IS NULL LIMIT 1
+            """,(rs,n)->new Link(rs.getObject(1,UUID.class),rs.getObject(2,UUID.class),
+                rs.getObject(3,UUID.class)),actor.tenantId(),employeeId));
+    }
+
+    @PostMapping("/admin/identity-links/{linkId}/revoke")
+    public Link revoke(@AuthenticationPrincipal HrmUserPrincipal actor,
+                       @PathVariable UUID linkId){
+        return tenants.inTenant(actor.tenantId(),()->{
+            List<Link> rows=jdbc.query("""
+                SELECT id,employee_id,identity_id FROM time_employee_identity_link
+                WHERE tenant_id=? AND id=? AND revoked_at IS NULL FOR UPDATE
+                """,(rs,n)->new Link(rs.getObject(1,UUID.class),rs.getObject(2,UUID.class),
+                    rs.getObject(3,UUID.class)),actor.tenantId(),linkId);
+            if(rows.isEmpty())
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"Active identity link not found");
+            jdbc.update("""
+                UPDATE time_employee_identity_link
+                SET revoked_at=now(),revoked_by=?
+                WHERE tenant_id=? AND id=? AND revoked_at IS NULL
+                """,actor.id(),actor.tenantId(),linkId);
+            audit(actor,"TIME_ESS_IDENTITY_REVOKED","time_employee_identity_link",linkId);
+            return rows.get(0);
+        });
+    }
+
     @GetMapping("/me")
     public Summary me(@AuthenticationPrincipal HrmUserPrincipal actor){
         return tenants.inTenant(actor.tenantId(),()->{
             List<UUID> linked=jdbc.query("""
                 SELECT employee_id FROM time_employee_identity_link
-                WHERE tenant_id=? AND identity_id=?
+                WHERE tenant_id=? AND identity_id=? AND revoked_at IS NULL
                 """,(rs,n)->rs.getObject(1,UUID.class),actor.tenantId(),actor.id());
             if(linked.size()!=1)
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN,
