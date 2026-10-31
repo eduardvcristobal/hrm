@@ -5,7 +5,8 @@ import './timekeeping.css';
 type Profile={employeeId:string;companyId:string;employeeNumber:string;firstName:string;lastName:string;employmentStatus:string};
 type Schedule={id:string;shiftId:string;effectiveFrom:string;effectiveUntil:string|null;weekdaysMask:number};
 type Leave={id:string;leaveTypeId:string;startsOn:string;endsOn:string;status:string};
-type SelfService={employee:Profile;schedules:Schedule[];leaveRequests:Leave[];clockInEnabled:boolean;locationCaptureEnabled:boolean;biometricCaptureEnabled:boolean;classification:string};
+type Attendance={id:string;clockInAt:string;clockOutAt:string|null};
+type SelfService={employee:Profile;schedules:Schedule[];leaveRequests:Leave[];attendanceSessions:Attendance[];clockInEnabled:boolean;locationCaptureEnabled:boolean;biometricCaptureEnabled:boolean;classification:string};
 const tokenKey='apexHrm.accessToken';
 export default function EmployeeSelfServicePage(){
   const [data,setData]=useState<SelfService|null>(null);
@@ -36,5 +37,11 @@ export default function EmployeeSelfServicePage(){
       <section className="timekeeping-card"><h2>My shift assignments</h2>{data.schedules.length===0?<p>No assignments recorded.</p>:<ul>{data.schedules.map(s=><li key={s.id}>{s.effectiveFrom} to {s.effectiveUntil||'open-ended'} · Shift {s.shiftId.slice(0,8)} · Weekday mask {s.weekdaysMask}</li>)}</ul>}</section>
       <section className="timekeeping-card"><h2>My leave requests</h2>{data.leaveRequests.length===0?<p>No leave requests recorded.</p>:<ul>{data.leaveRequests.map(l=><li key={l.id}>{l.startsOn} to {l.endsOn} — <strong>{l.status}</strong></li>)}</ul>}</section>
     </div>}
+    {data&&<section className="timekeeping-card"><h2>My recent attendance (raw, not payable)</h2>
+      {data.attendanceSessions.length===0?<p>No attendance sessions recorded.</p>:<div style={{overflowX:'auto'}}><table style={{width:'100%',borderSpacing:12,textAlign:'left'}}><thead><tr><th>Clock in (UTC)</th><th>Clock out (UTC)</th><th>Status</th></tr></thead><tbody>
+        {data.attendanceSessions.map(a=><tr key={a.id}><td>{a.clockInAt}</td><td>{a.clockOutAt||'—'}</td><td>{a.clockOutAt?'Closed':'Open'}</td></tr>)}
+      </tbody></table></div>}
+      <p>These timestamps are source events, not confirmed hours, overtime or payroll.</p>
+    </section>}
   </main>;
 }
