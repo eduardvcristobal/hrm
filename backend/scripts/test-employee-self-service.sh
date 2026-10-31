@@ -27,8 +27,8 @@ LINK_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-m29-link.json"
 REPLAY_LINK="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$(printf '{"identityId":"%s","employeeId":"%s"}' "$EMP_IDENTITY" "$EMP_ID")" "$ES_BASE/admin/identity-links")"
 { test "$REPLAY_LINK" = 403 || test "$REPLAY_LINK" = 409; } || { echo "Duplicate ESS link accepted: $REPLAY_LINK"; exit 1; }
 curl -fsS -H "Authorization: Bearer $EMP_TOKEN" "$ES_BASE/me" > /tmp/hrm-m29-me.json
-python3 -c 'import json,sys;x=json.load(open("/tmp/hrm-m29-me.json")); assert x["employee"]["employeeId"]==sys.argv[1];assert isinstance(x["schedules"],list) and isinstance(x["leaveRequests"],list) and isinstance(x["attendanceSessions"],list) and len(x["attendanceSessions"])>=1;assert x["clockInEnabled"] is False and x["locationCaptureEnabled"] is False and x["biometricCaptureEnabled"] is False;assert "READ_ONLY" in x["classification"]' "$EMP_ID"
-# No employee-chosen identifier or mutation endpoint exists on this surface.
+python3 -c 'import json,sys;x=json.load(open("/tmp/hrm-m29-me.json")); assert x["employee"]["employeeId"]==sys.argv[1];assert isinstance(x["schedules"],list) and isinstance(x["leaveRequests"],list) and isinstance(x["attendanceSessions"],list) and len(x["attendanceSessions"])>=1;assert x["clockInEnabled"] is False and x["locationCaptureEnabled"] is False and x["biometricCaptureEnabled"] is False;assert "VERIFIED_EMPLOYEE" in x["classification"] && isinstance(x["availableLeaveCategories"],list)' "$EMP_ID"
+# Client-supplied employee identifiers and device mutations are not accepted.
 OTHER="$(curl -sS -H "Authorization: Bearer $EMP_TOKEN" -o /dev/null -w '%{http_code}' "$ES_BASE/employees/$EMP_ID/attendance")"
 { test "$OTHER" = 403 || test "$OTHER" = 404; } || { echo "Client-supplied employee path accepted: $OTHER"; exit 1; }
 CLOCK="$(curl -sS -H "Authorization: Bearer $EMP_TOKEN" -o /dev/null -w '%{http_code}' -X POST "$ES_BASE/me/clock-in")"
