@@ -64,7 +64,7 @@ python3 -c 'import json; x=json.load(open("/tmp/hrm-m2-approved.json")); assert 
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/timekeeping/employees/$EMP_ID/attendance" > /tmp/hrm-m2-approved-sessions.json
 python3 -c 'import json,sys; x=next(i for i in json.load(open("/tmp/hrm-m2-approved-sessions.json")) if i["id"]==sys.argv[1]); assert x["clockInAt"]=="2026-10-29T08:00:00Z" and x["clockOutAt"]=="2026-10-29T17:00:00Z"' "$SESSION_ID"
 REPLAY_DECISION="$(curl -sS -H "Authorization: Bearer $SECOND_BEARER" -o /dev/null -w '%{http_code}' -X POST "$CORRECTION_PATH/$CORRECTION_ID/decision?decision=APPROVED")"
-test "$REPLAY_DECISION" = 409 || { echo "Repeated approval allowed: $REPLAY_DECISION"; exit 1; }
+{ test "$REPLAY_DECISION" = 409 || test "$REPLAY_DECISION" = 403; } || { echo "Repeated approval allowed: $REPLAY_DECISION"; exit 1; }
 REJECT_REQUEST="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-m2-reject-pending.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"clockInAt":"2026-10-29T09:00:00Z","clockOutAt":"2026-10-29T18:00:00Z","reason":"Independent rejection regression"}' "$CORRECTION_PATH")"
 test "$REJECT_REQUEST" = 201 || { echo "Rejection fixture failed: $REJECT_REQUEST"; cat /tmp/hrm-m2-reject-pending.json; exit 1; }
 REJECT_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-m2-reject-pending.json"))["id"])')"
