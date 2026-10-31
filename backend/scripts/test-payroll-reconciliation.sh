@@ -46,3 +46,6 @@ test "$NEXT_CLOCK_OUT" = 200 || { echo "Stale evidence clock-out failed: $NEXT_C
 STALE_REVIEW="$(curl -sS -H "Authorization: Bearer $SECOND_BEARER" -o /dev/null -w '%{http_code}' -X POST "$ROOT/packages/$STALE_ID/review")"
 { test "$STALE_REVIEW" = 403 || test "$STALE_REVIEW" = 409; } || { echo "Changed evidence was reviewed: $STALE_REVIEW"; exit 1; }
 echo "M2.7 internal-only package blocked, independently reviewed, replay denied and stale-source invalidation passed"
+
+# M2.8 controlled reporting and retention certification after the reconciliation fixtures.
+source scripts/test-timekeeping-reports.sh
