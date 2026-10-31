@@ -22,4 +22,27 @@ curl -fsS -H "Authorization: Bearer $BEARER" "$ROOT/packages" > /tmp/hrm-m27-lis
 python3 -c 'import json,sys; a=json.load(open("/tmp/hrm-m27-list.json"));x=next(i for i in a if i["id"]==sys.argv[1]);assert x["status"]=="DRAFT" and x["payrollReady"] is False' "$DRAFT_ID"
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/audit-logs?limit=500" > /tmp/hrm-m27-audit.json
 python3 -c 'import json,sys;a=json.load(open("/tmp/hrm-m27-audit.json"));assert any(x["entityId"]==sys.argv[1] and x["action"]=="TIME_RECONCILIATION_PREPARED" for x in a)' "$DRAFT_ID"
-echo "M2.7 internal reconciliation blockers, source fingerprint, independent review denial and audit passed"
+# Clean October-only period has one closed attendance session, no November
+# calendar classifications or leave requests, and no pending correction.
+CLEAN_ROOT="$ROOT"
+CLEAN_CODE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-m27-clean.json -w '%{http_code}' -X POST "$CLEAN_ROOT/packages?from=2026-10-31&to=2026-10-31&timezone=Asia%2FManila")"
+test "$CLEAN_CODE" = 201 || { echo "Clean reconciliation fixture failed: $CLEAN_CODE"; cat /tmp/hrm-m27-clean.json; exit 1; }
+CLEAN_ID="$(python3 -c 'import json; x=json.load(open("/tmp/hrm-m27-clean.json")); assert x["status"]=="DRAFT" and not x["summary"]["blockerCodes"]; print(x["id"])')"
+REVIEW_CODE="$(curl -sS -H "Authorization: Bearer $SECOND_BEARER" -o /tmp/hrm-m27-reviewed.json -w '%{http_code}' -X POST "$ROOT/packages/$CLEAN_ID/review")"
+test "$REVIEW_CODE" = 200 || { echo "Independent internal review failed: $REVIEW_CODE"; cat /tmp/hrm-m27-reviewed.json; exit 1; }
+python3 -c 'import json; x=json.load(open("/tmp/hrm-m27-reviewed.json")); assert x["status"]=="INTERNALLY_REVIEWED" and x["reviewedBy"]!=x["createdBy"] and x["payrollReady"] is False'
+REVIEW_REPLAY="$(curl -sS -H "Authorization: Bearer $SECOND_BEARER" -o /dev/null -w '%{http_code}' -X POST "$ROOT/packages/$CLEAN_ID/review")"
+{ test "$REVIEW_REPLAY" = 403 || test "$REVIEW_REPLAY" = 409; } || { echo "Repeated internal reconciliation review accepted: $REVIEW_REPLAY"; exit 1; }
+# A second package snapshots overlapping dates; a new attendance session
+# must invalidate its fingerprint before any independent acknowledgment.
+STALE_CODE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-m27-stale.json -w '%{http_code}' -X POST "$ROOT/packages?from=2026-10-30&to=2026-10-31&timezone=Asia%2FManila")"
+test "$STALE_CODE" = 201 || { echo "Staleness fixture failed: $STALE_CODE"; exit 1; }
+STALE_ID="$(python3 -c 'import json; x=json.load(open("/tmp/hrm-m27-stale.json"));assert not x["summary"]["blockerCodes"];print(x["id"])')"
+NEXT_CLOCK_IN="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-m27-new-in.json -w '%{http_code}' -X POST "$BASE/api/v1/timekeeping/employees/$EMP_ID/attendance/clock-in")"
+test "$NEXT_CLOCK_IN" = 201 || { echo "Stale evidence clock-in failed: $NEXT_CLOCK_IN"; exit 1; }
+NEW_SESSION="$(python3 -c 'import json; print(json.load(open("/tmp/hrm-m27-new-in.json"))["id"])')"
+NEXT_CLOCK_OUT="$(curl -sS -H "Authorization: Bearer $BEARER" -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/timekeeping/employees/$EMP_ID/attendance/$NEW_SESSION/clock-out")"
+test "$NEXT_CLOCK_OUT" = 200 || { echo "Stale evidence clock-out failed: $NEXT_CLOCK_OUT"; exit 1; }
+STALE_REVIEW="$(curl -sS -H "Authorization: Bearer $SECOND_BEARER" -o /dev/null -w '%{http_code}' -X POST "$ROOT/packages/$STALE_ID/review")"
+{ test "$STALE_REVIEW" = 403 || test "$STALE_REVIEW" = 409; } || { echo "Changed evidence was reviewed: $STALE_REVIEW"; exit 1; }
+echo "M2.7 internal-only package blocked, independently reviewed, replay denied and stale-source invalidation passed"
