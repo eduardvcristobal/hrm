@@ -26,6 +26,8 @@ test('payroll configuration and period metadata stays draft-only',async({page})=
     const {pathname}=new URL(route.request().url());
     if(pathname.endsWith('/configurations')){
       await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(configs)});
+    }else if(pathname.endsWith('/components')){
+      await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{id:'40000000-0000-0000-0000-000000000001',companyId:COMPANY,componentCode:'BASIC_PAY',componentName:'Basic pay',componentKind:'EARNING',effectiveFrom:'2026-01-01',treatment:'UNREVIEWED',classification:'CATALOGUE_ONLY_NO_PAYROLL_CALCULATION'}])});
     }else if(pathname.endsWith('/periods')){
       await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(drafts)});
     }else{
@@ -36,6 +38,7 @@ test('payroll configuration and period metadata stays draft-only',async({page})=
   await page.getByLabel('Payroll company UUID').fill(COMPANY);
   await page.getByRole('button',{name:'Load payroll drafts'}).click();
   await expect(page.getByText('SEMI_MONTHLY · PHP · 2026-01-01')).toBeVisible();
+  await expect(page.getByText(/BASIC_PAY — Basic pay/)).toBeVisible();
   await expect(page.getByText(/2026-11-01 – 2026-11-15/)).toBeVisible();
   await expect(page.getByText(/DRAFT/).last()).toBeVisible();
   await expect(page.getByRole('button',{name:/release|calculate|approve payroll/i})).toHaveCount(0);
