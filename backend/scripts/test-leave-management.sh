@@ -29,4 +29,13 @@ test "$CANCEL_RESULT" = 200 || { echo "Leave cancellation failed: $CANCEL_RESULT
 python3 -c 'import json;assert json.load(open("/tmp/hrm-m2-leave-cancelled.json"))["status"]=="CANCELLED"'
 CANCEL_REVIEW="$(curl -sS -H "Authorization: Bearer $SECOND_BEARER" -o /dev/null -w '%{http_code}' -X POST "$LEAVE_BASE/employees/$EMP_ID/leave-requests/$CANCEL_ID/decision?decision=APPROVED")"
 { test "$CANCEL_REVIEW" = 403 || test "$CANCEL_REVIEW" = 409; } || { echo "Cancelled leave approval accepted: $CANCEL_REVIEW"; exit 1; }
-echo "M2.5 leave type, independent approval, overlap, replay and cancellation HTTP regression passed"
+# Verify independent rejection and immutable audit traces in the real database.
+REJECT_LEAVE_CODE="$(curl -sS -H "Authorization: Bearer $BEARER" -o /tmp/hrm-m2-leave-reject.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data "$(printf '{"leaveTypeId":"%s","from":"2026-11-23","to":"2026-11-24","reason":"Independent rejection test"}' "$LEAVE_TYPE_ID")" "$LEAVE_BASE/employees/$EMP_ID/leave-requests")"
+test "$REJECT_LEAVE_CODE" = 201 || { echo "Leave reject fixture failed: $REJECT_LEAVE_CODE"; exit 1; }
+LEAVE_REJECT_ID="$(python3 -c 'import json;print(json.load(open("/tmp/hrm-m2-leave-reject.json"))["id"])')"
+REJECT_LEAVE_HTTP="$(curl -sS -H "Authorization: Bearer $SECOND_BEARER" -o /tmp/hrm-m2-leave-rejected.json -w '%{http_code}' -X POST "$LEAVE_BASE/employees/$EMP_ID/leave-requests/$LEAVE_REJECT_ID/decision?decision=REJECTED")"
+test "$REJECT_LEAVE_HTTP" = 200 || { echo "Independent leave rejection failed: $REJECT_LEAVE_HTTP"; exit 1; }
+python3 -c 'import json; x=json.load(open("/tmp/hrm-m2-leave-rejected.json"));assert x["status"]=="REJECTED" and x["reviewedBy"]!=x["requestedBy"]'
+PGPASSWORD="$DB_PASSWORD" psql -X -v ON_ERROR_STOP=1 -h localhost -p 5433 -U "${DB_USERNAME:-hrm_app}" -d hrm_dev -At -c "SELECT count(*) FROM audit_event WHERE entity_type='time_leave_request' AND entity_id='$LEAVE_ID' AND action IN ('TIME_LEAVE_REQUESTED','TIME_LEAVE_APPROVED')" | grep -qx '2'
+PGPASSWORD="$DB_PASSWORD" psql -X -v ON_ERROR_STOP=1 -h localhost -p 5433 -U "${DB_USERNAME:-hrm_app}" -d hrm_dev -At -c "SELECT count(*) FROM audit_event WHERE entity_type='time_leave_request' AND entity_id='$LEAVE_REJECT_ID' AND action IN ('TIME_LEAVE_REQUESTED','TIME_LEAVE_REJECTED')" | grep -qx '2'
+echo "M2.5 leave type, independent approval/rejection, overlap, replay, cancellation and audit HTTP regression passed"
