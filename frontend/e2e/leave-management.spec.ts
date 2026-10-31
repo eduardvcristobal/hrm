@@ -8,7 +8,11 @@ test('leave management renders controlled administration workflow',async({page})
   await expect(page.getByRole('heading',{name:'Employee leave requests'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Monthly leave credits (M2.5.1 preview)'})).toBeVisible();
   await expect(page.getByText('Employee accrued credits (not spendable)')).toBeVisible();
-  await expect(page.getByText('Spendable entitlements, leave debit, statutory leave and payroll effects remain unimplemented')).toBeVisible();
+  await expect(page.getByText('Manual approved-leave debit and compensating reversal are available.')).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Manual leave reconciliation (M2.5.2)'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Carryover planning (preview only)'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Post reviewed debit'})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'Preview carryover'})).toBeDisabled();
   await expect(page.getByRole('button',{name:'Create category'})).toBeDisabled();
   await expect(page.getByRole('button',{name:'Submit for review'})).toBeDisabled();
 });
