@@ -9,6 +9,7 @@ import CalendarPolicyPage from './CalendarPolicyPage';
 import PayrollReconciliationPage from './PayrollReconciliationPage';
 import TimekeepingReportsPage from './TimekeepingReportsPage';
 import EmployeeSelfServicePage from './EmployeeSelfServicePage';
+import EmployeeIdentityAdminPage from './EmployeeIdentityAdminPage';
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 
@@ -27,6 +28,7 @@ function AppRoutes() {
         <Route path="/reconciliation" element={<PayrollReconciliationPage />} />
         <Route path="/timekeeping-reports" element={<TimekeepingReportsPage />} />
         <Route path="/my-timekeeping" element={<EmployeeSelfServicePage />} />
+        <Route path="/employee-access" element={<EmployeeIdentityAdminPage />} />
         <Route path="*" element={<App />} />
       </Routes>
     </BrowserRouter>
