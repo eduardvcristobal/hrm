@@ -13,6 +13,9 @@ INSERT INTO tenant(slug,display_name) VALUES('m210-replica-ci','M2.10 Synthetic 
 INSERT INTO auth_identity(tenant_id,email,password_hash,enabled)
 SELECT id,'m210-replica-employee@example.invalid','ci-no-login',true
 FROM tenant WHERE slug='m210-replica-ci';
+INSERT INTO auth_identity(tenant_id,email,password_hash,enabled)
+SELECT id,'m210-replica-admin@example.invalid','ci-no-login',true
+FROM tenant WHERE slug='m210-replica-ci';
 INSERT INTO auth_identity_role(identity_id,role)
 SELECT id,'EMPLOYEE' FROM auth_identity WHERE email='m210-replica-employee@example.invalid';
 INSERT INTO auth_api_token(identity_id,token_sha256,expires_at,mfa_verified)
@@ -37,7 +40,7 @@ SELECT e.tenant_id,e.id,i.id,'CI two-process enrolled device','ACTIVE',admin.id,
  now(),now(),:'device_hash',now()+interval '1 hour'
 FROM personnel_employee e
  JOIN auth_identity i ON i.tenant_id=e.tenant_id
- JOIN auth_identity admin ON admin.id=i.id
+ JOIN auth_identity admin ON admin.tenant_id=e.tenant_id AND admin.email='m210-replica-admin@example.invalid'
 WHERE e.employee_number='M210-REPLICA' AND i.email='m210-replica-employee@example.invalid';
 COMMIT;
 SQL
