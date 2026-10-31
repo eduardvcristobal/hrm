@@ -74,3 +74,6 @@ python3 -c 'import json; x=json.load(open("/tmp/hrm-m2-rejected.json"));assert x
 curl -fsS -H "Authorization: Bearer $BEARER" "$BASE/api/v1/timekeeping/employees/$EMP_ID/attendance" > /tmp/hrm-m2-rejected-sessions.json
 python3 -c 'import json,sys; x=next(i for i in json.load(open("/tmp/hrm-m2-rejected-sessions.json")) if i["id"]==sys.argv[1]); assert x["clockInAt"]=="2026-10-29T08:00:00Z" and x["clockOutAt"]=="2026-10-29T17:00:00Z"' "$SESSION_ID"
 echo "M2.4 independent approval/rejection and replay HTTP regression passed"
+
+# M2.6 provisional calendar classification uses the above employee and shift fixtures.
+source scripts/test-calendar-policy.sh
