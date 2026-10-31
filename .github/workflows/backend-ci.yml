@@ -64,6 +64,7 @@ jobs:
           bash scripts/test-api-security.sh
           bash scripts/test-runtime-role.sh
           PGPASSWORD="$DB_PASSWORD" psql -X -v ON_ERROR_STOP=1 -h localhost -p 5433 -U "$DB_USERNAME" -d hrm_dev -f scripts/test-personnel-rls.sql
+          PGPASSWORD="$DB_PASSWORD" psql -X -v ON_ERROR_STOP=1 -h localhost -p 5433 -U "$DB_USERNAME" -d hrm_dev -f scripts/test-payroll-rls.sql
 
   personnel-frontend:
     name: Personnel frontend build
