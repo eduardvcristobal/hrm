@@ -6,6 +6,7 @@ import App, { InvitationAcceptance } from './App';
 import TimekeepingPage from './TimekeepingPage';
 import LeaveManagementPage from './LeaveManagementPage';
 import CalendarPolicyPage from './CalendarPolicyPage';
+import PayrollReconciliationPage from './PayrollReconciliationPage';
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 
@@ -21,6 +22,7 @@ function AppRoutes() {
         <Route path="/timekeeping" element={<TimekeepingPage />} />
         <Route path="/leave" element={<LeaveManagementPage />} />
         <Route path="/calendar" element={<CalendarPolicyPage />} />
+        <Route path="/reconciliation" element={<PayrollReconciliationPage />} />
         <Route path="*" element={<App />} />
       </Routes>
     </BrowserRouter>
